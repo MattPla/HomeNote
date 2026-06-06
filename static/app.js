@@ -133,15 +133,49 @@ function renderWeather(hours) {
   container.innerHTML = hours
     .map((hour, index) => {
       const label = index === 0 ? "Now" : formatDateTime(hour.time, { hour: "numeric" });
+      const condition = hour.condition || "Cloudy / Overcast";
       return `
-        <article class="weather-hour">
+        <article class="weather-hour condition-${escapeClass(hour.conditionKey || "cloudy")}">
           <p class="weather-time">${escapeHtml(label)}</p>
-          <h3>${escapeHtml(hour.temperature)}&deg;</h3>
+          <div class="weather-main">
+            <span class="weather-icon" title="${escapeHtml(condition)}" aria-label="${escapeHtml(condition)}">
+              ${weatherIcon(hour.icon || "cloud")}
+            </span>
+            <h3>${escapeHtml(hour.temperature)}&deg;</h3>
+          </div>
           <p class="rain">${escapeHtml(hour.rainChance)}% rain</p>
         </article>
       `;
     })
     .join("");
+}
+
+function weatherIcon(name) {
+  const icons = {
+    sun: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"></path></svg>`,
+    "mostly-sunny": `<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3.2"></circle><path d="M8 2.5v2M8 11.5v2M2.5 8h2M11.5 8h2M4.1 4.1l1.4 1.4M10.5 10.5l1.4 1.4M4.1 11.9l1.4-1.4M10.5 5.5l1.4-1.4M9 18h8.5a3.5 3.5 0 0 0 .4-7 5.5 5.5 0 0 0-10.5 2"></path></svg>`,
+    "partly-cloudy": `<svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"></circle><path d="M8 2.5v2M2.5 8h2M4 4l1.4 1.4M12 12.5A5 5 0 0 1 21.5 15a3.5 3.5 0 0 1-3.5 3.5H8.5a4 4 0 1 1 1-7.9"></path></svg>`,
+    cloud: `<svg viewBox="0 0 24 24"><path d="M6.5 18h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.3 2A3 3 0 0 0 6.5 18Z"></path></svg>`,
+    rain: `<svg viewBox="0 0 24 24"><path d="M6.5 14.5h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.3 2A3 3 0 0 0 6.5 14.5Z"></path><path d="M8 18l-1 2M12 18l-1 2M16 18l-1 2"></path></svg>`,
+    drizzle: `<svg viewBox="0 0 24 24"><path d="M6.5 14.5h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.3 2A3 3 0 0 0 6.5 14.5Z"></path><path d="M9 18v1.5M13 18v1.5M17 18v1.5"></path></svg>`,
+    "heavy-rain": `<svg viewBox="0 0 24 24"><path d="M6.5 13.5h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.3 2A3 3 0 0 0 6.5 13.5Z"></path><path d="M7 17l-1.4 3M11 17l-1.4 3M15 17l-1.4 3M19 17l-1.4 3"></path></svg>`,
+    storm: `<svg viewBox="0 0 24 24"><path d="M6.5 13.5h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.3 2A3 3 0 0 0 6.5 13.5Z"></path><path d="M13 14l-3 5h3l-1 4 4-6h-3l2-3"></path></svg>`,
+    hail: `<svg viewBox="0 0 24 24"><path d="M6.5 13.5h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.3 2A3 3 0 0 0 6.5 13.5Z"></path><circle cx="8" cy="18" r="1"></circle><circle cx="13" cy="20" r="1"></circle><circle cx="18" cy="18" r="1"></circle></svg>`,
+    snow: `<svg viewBox="0 0 24 24"><path d="M6.5 13.5h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.3 2A3 3 0 0 0 6.5 13.5Z"></path><path d="M12 16v6M9.5 17.5l5 3M14.5 17.5l-5 3"></path></svg>`,
+    "light-snow": `<svg viewBox="0 0 24 24"><path d="M6.5 14h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.3 2A3 3 0 0 0 6.5 14Z"></path><path d="M10 18v3M14 18v3"></path></svg>`,
+    "heavy-snow": `<svg viewBox="0 0 24 24"><path d="M6.5 13h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.3 2A3 3 0 0 0 6.5 13Z"></path><path d="M8 16v5M12 16v5M16 16v5M6.5 18.5h11"></path></svg>`,
+    sleet: `<svg viewBox="0 0 24 24"><path d="M6.5 13.5h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.3 2A3 3 0 0 0 6.5 13.5Z"></path><path d="M8 17l-1 2M12 17v2.5M16 17l-1 2"></path><circle cx="19" cy="19" r=".9"></circle></svg>`,
+    "freezing-rain": `<svg viewBox="0 0 24 24"><path d="M6.5 13.5h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.3 2A3 3 0 0 0 6.5 13.5Z"></path><path d="M8 17l-1 2M12 16.5v4M10.5 18.5h3M16 17l-1 2"></path></svg>`,
+    fog: `<svg viewBox="0 0 24 24"><path d="M6.5 11h11a4 4 0 0 0 .5-8 6 6 0 0 0-11.3 2A3 3 0 0 0 6.5 11Z"></path><path d="M3 15h18M5 18h14M3 21h18"></path></svg>`,
+    wind: `<svg viewBox="0 0 24 24"><path d="M3 8h12a3 3 0 1 0-3-3"></path><path d="M3 13h17"></path><path d="M3 18h11a3 3 0 1 1-3 3"></path></svg>`,
+    hot: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 1.5v3M12 19.5v3M4.6 4.6 6.8 6.8M17.2 17.2l2.2 2.2M1.5 12h3M19.5 12h3M4.6 19.4l2.2-2.2M17.2 6.8l2.2-2.2"></path><path d="M17.5 3.5c1.8 1.7 2.8 3.8 3 6.2"></path></svg>`,
+    cold: `<svg viewBox="0 0 24 24"><path d="M12 2v20M5 5l14 14M19 5 5 19M3 12h18"></path></svg>`,
+    moon: `<svg viewBox="0 0 24 24"><path d="M18.5 15.5A8 8 0 0 1 8.5 5.5 8 8 0 1 0 18.5 15.5Z"></path></svg>`,
+    "cloudy-night": `<svg viewBox="0 0 24 24"><path d="M14 5a6 6 0 0 0 4.5 8.8A6.5 6.5 0 1 1 14 5Z"></path><path d="M7 19h10a3.5 3.5 0 0 0 .4-7 5 5 0 0 0-9.5 1.5A2.8 2.8 0 0 0 7 19Z"></path></svg>`,
+    sunrise: `<svg viewBox="0 0 24 24"><path d="M3 19h18M5 15a7 7 0 0 1 14 0M12 3v8M8.5 6.5 12 3l3.5 3.5"></path></svg>`,
+    sunset: `<svg viewBox="0 0 24 24"><path d="M3 19h18M5 15a7 7 0 0 1 14 0M12 3v8M8.5 7.5 12 11l3.5-3.5"></path></svg>`,
+  };
+  return icons[name] || icons.cloud;
 }
 
 function renderNews(headlines) {
@@ -176,6 +210,10 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function escapeClass(value) {
+  return String(value ?? "").toLowerCase().replace(/[^a-z0-9-]/g, "-");
 }
 
 async function refresh() {

@@ -230,8 +230,10 @@ def fetch_weather(config: dict[str, Any]) -> tuple[list[dict[str, Any]], str | N
         params={
             "latitude": latitude,
             "longitude": longitude,
-            "hourly": "temperature_2m,precipitation_probability",
+            "hourly": "temperature_2m,precipitation_probability,weather_code,is_day,wind_speed_10m",
+            "daily": "sunrise,sunset",
             "temperature_unit": "fahrenheit",
+            "wind_speed_unit": "mph",
             "timezone": tz_name,
             "forecast_days": 2,
         },
@@ -242,6 +244,20 @@ def fetch_weather(config: dict[str, Any]) -> tuple[list[dict[str, Any]], str | N
     times = hourly.get("time", [])
     temperatures = hourly.get("temperature_2m", [])
     rain_chances = hourly.get("precipitation_probability", [])
+    weather_codes = hourly.get("weather_code", [])
+    is_day_values = hourly.get("is_day", [])
+    wind_speeds = hourly.get("wind_speed_10m", [])
+    daily = response.json().get("daily", {})
+    sunrise_hours = {
+        datetime.fromisoformat(value).replace(tzinfo=tz).replace(minute=0, second=0, microsecond=0)
+        for value in daily.get("sunrise", [])
+        if value
+    }
+    sunset_hours = {
+        datetime.fromisoformat(value).replace(tzinfo=tz).replace(minute=0, second=0, microsecond=0)
+        for value in daily.get("sunset", [])
+        if value
+    }
     forecast = []
 
     for index, time_value in enumerate(times):
@@ -249,17 +265,97 @@ def fetch_weather(config: dict[str, Any]) -> tuple[list[dict[str, Any]], str | N
         if hour < now or hour >= end:
             continue
 
+        temperature = round(float(temperatures[index]))
+        rain_chance = int(rain_chances[index] if rain_chances[index] is not None else 0)
+        weather_code = int(weather_codes[index] if index < len(weather_codes) and weather_codes[index] is not None else 0)
+        is_day = bool(is_day_values[index] if index < len(is_day_values) else True)
+        wind_speed = float(wind_speeds[index] if index < len(wind_speeds) and wind_speeds[index] is not None else 0)
+        condition = classify_weather_condition(
+            weather_code=weather_code,
+            temperature=temperature,
+            wind_speed=wind_speed,
+            is_day=is_day,
+            is_sunrise=hour in sunrise_hours,
+            is_sunset=hour in sunset_hours,
+        )
+
         forecast.append(
             {
                 "time": hour.isoformat(),
-                "temperature": round(float(temperatures[index])),
-                "rainChance": int(rain_chances[index] if rain_chances[index] is not None else 0),
+                "temperature": temperature,
+                "rainChance": rain_chance,
+                "weatherCode": weather_code,
+                "windSpeed": round(wind_speed),
+                "condition": condition["label"],
+                "conditionKey": condition["key"],
+                "icon": condition["icon"],
             }
         )
         if len(forecast) >= 12:
             break
 
     return forecast, None
+
+
+def classify_weather_condition(
+    weather_code: int,
+    temperature: int,
+    wind_speed: float,
+    is_day: bool,
+    is_sunrise: bool,
+    is_sunset: bool,
+) -> dict[str, str]:
+    if is_sunrise:
+        return {"key": "sunrise", "label": "Sunrise", "icon": "sunrise"}
+    if is_sunset:
+        return {"key": "sunset", "label": "Sunset", "icon": "sunset"}
+
+    if weather_code in {95}:
+        return {"key": "thunderstorm", "label": "Thunderstorm", "icon": "storm"}
+    if weather_code in {96, 99}:
+        return {"key": "hail", "label": "Hail", "icon": "hail"}
+    if weather_code in {80, 81}:
+        return {"key": "showers" if is_day else "rainy-night", "label": "Showers" if is_day else "Rainy Night", "icon": "rain"}
+    if weather_code == 82:
+        return {"key": "heavy-rain", "label": "Heavy Rain", "icon": "heavy-rain"}
+    if weather_code in {61, 63}:
+        return {"key": "rain" if is_day else "rainy-night", "label": "Rain" if is_day else "Rainy Night", "icon": "rain"}
+    if weather_code == 65:
+        return {"key": "heavy-rain", "label": "Heavy Rain", "icon": "heavy-rain"}
+    if weather_code in {51, 53, 55}:
+        return {"key": "light-rain", "label": "Light Rain / Drizzle", "icon": "drizzle"}
+    if weather_code in {56, 57, 66, 67}:
+        return {"key": "freezing-rain", "label": "Freezing Rain", "icon": "freezing-rain"}
+    if weather_code in {85, 86}:
+        return {"key": "snowy-night" if not is_day else "snow", "label": "Snowy Night" if not is_day else "Snow", "icon": "snow"}
+    if weather_code == 71:
+        return {"key": "light-snow", "label": "Light Snow", "icon": "light-snow"}
+    if weather_code == 73:
+        return {"key": "snowy-night" if not is_day else "snow", "label": "Snowy Night" if not is_day else "Snow", "icon": "snow"}
+    if weather_code == 75:
+        return {"key": "heavy-snow", "label": "Heavy Snow", "icon": "heavy-snow"}
+    if weather_code == 77:
+        return {"key": "sleet", "label": "Sleet", "icon": "sleet"}
+    if weather_code in {45, 48}:
+        return {"key": "fog", "label": "Fog", "icon": "fog"}
+
+    if temperature >= 95:
+        return {"key": "hot", "label": "Hot / Heat", "icon": "hot"}
+    if temperature <= 32:
+        return {"key": "cold", "label": "Cold / Freeze", "icon": "cold"}
+    if wind_speed >= 25:
+        return {"key": "windy", "label": "Windy", "icon": "wind"}
+
+    if weather_code == 0:
+        return {"key": "sunny" if is_day else "clear-night", "label": "Sunny / Clear" if is_day else "Moon / Clear Night", "icon": "sun" if is_day else "moon"}
+    if weather_code == 1:
+        return {"key": "mostly-sunny" if is_day else "clear-night", "label": "Mostly Sunny" if is_day else "Moon / Clear Night", "icon": "mostly-sunny" if is_day else "moon"}
+    if weather_code == 2:
+        return {"key": "partly-cloudy" if is_day else "cloudy-night", "label": "Partly Cloudy" if is_day else "Cloudy Night", "icon": "partly-cloudy" if is_day else "cloudy-night"}
+    if weather_code == 3:
+        return {"key": "cloudy" if is_day else "cloudy-night", "label": "Cloudy / Overcast" if is_day else "Cloudy Night", "icon": "cloud" if is_day else "cloudy-night"}
+
+    return {"key": "cloudy", "label": "Cloudy / Overcast", "icon": "cloud"}
 
 
 def fetch_news(config: dict[str, Any]) -> list[dict[str, str]]:

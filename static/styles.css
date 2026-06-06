@@ -168,7 +168,7 @@ h1 {
 
 .weather-hour {
   min-height: 64px;
-  padding: 8px 6px;
+  padding: 7px 5px;
   display: grid;
   align-content: center;
   justify-items: center;
@@ -182,9 +182,88 @@ h1 {
 }
 
 .weather-hour h3 {
-  font-size: 22px;
+  font-size: 21px;
   line-height: 1;
+}
+
+.weather-main {
+  display: inline-grid;
+  grid-template-columns: 18px auto;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   margin: 4px 0 3px;
+}
+
+.weather-icon {
+  width: 18px;
+  height: 18px;
+  color: #f8d76d;
+}
+
+.weather-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.condition-cloudy,
+.condition-cloudy-night,
+.condition-partly-cloudy {
+  color: #d7dde2;
+}
+
+.condition-rain,
+.condition-light-rain,
+.condition-heavy-rain,
+.condition-showers,
+.condition-rainy-night,
+.condition-freezing-rain,
+.condition-sleet {
+  color: #9ed1ff;
+}
+
+.condition-thunderstorm,
+.condition-lightning,
+.condition-hail {
+  color: #ffd166;
+}
+
+.condition-snow,
+.condition-light-snow,
+.condition-heavy-snow,
+.condition-snowy-night,
+.condition-cold {
+  color: #d7f4ff;
+}
+
+.condition-fog,
+.condition-mist-haze,
+.condition-smoke,
+.condition-dust-sandstorm {
+  color: #d1d0c7;
+}
+
+.condition-windy {
+  color: #c9f2e3;
+}
+
+.condition-hot,
+.condition-sunrise,
+.condition-sunset {
+  color: #ffb25c;
+}
+
+.condition-clear-night .weather-icon,
+.condition-cloudy-night .weather-icon,
+.condition-rainy-night .weather-icon,
+.condition-snowy-night .weather-icon {
+  color: #c8d9ff;
 }
 
 .event {
