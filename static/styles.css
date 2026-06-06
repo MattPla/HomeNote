@@ -1,0 +1,386 @@
+:root {
+  color-scheme: dark;
+  --bg: #111512;
+  --panel: rgba(20, 25, 22, 0.82);
+  --panel-strong: rgba(13, 17, 15, 0.9);
+  --text: #f3f0e8;
+  --muted: #aeb9af;
+  --line: rgba(226, 238, 222, 0.2);
+  --accent: #b8d576;
+  --alert: #ffb25c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.background-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-position: center;
+  background-size: cover;
+  opacity: 0;
+  transform: scale(1.02);
+  transition: opacity 2s ease;
+}
+
+.background-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(8, 10, 9, 0.72), rgba(8, 10, 9, 0.5)),
+    linear-gradient(180deg, rgba(8, 10, 9, 0.2), rgba(8, 10, 9, 0.68));
+}
+
+.background-layer.active {
+  opacity: 1;
+}
+
+.dashboard {
+  position: relative;
+  z-index: 1;
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  overflow: hidden;
+  padding: 20px 34px 14px;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) 16px 36px;
+  gap: 12px;
+}
+
+.topbar,
+.content {
+  display: grid;
+  gap: 28px;
+}
+
+.topbar {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.eyebrow,
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+.eyebrow {
+  color: var(--accent);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+h1 {
+  font-size: 48px;
+  line-height: 1;
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+.clock {
+  font-size: 54px;
+  font-weight: 800;
+  line-height: 0.95;
+}
+
+.content {
+  grid-template-columns: minmax(0, 1.45fr) minmax(340px, 0.8fr);
+  min-height: 0;
+}
+
+.agenda,
+.tasks,
+.homework,
+.right-stack {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.right-stack {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 0.85fr);
+  gap: 12px;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.section-heading h2 {
+  font-size: 22px;
+}
+
+.section-heading span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.event-list,
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100% - 36px);
+  overflow: hidden;
+}
+
+.weather-list {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.event,
+.task,
+.empty,
+.weather-hour {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.weather-hour {
+  min-height: 64px;
+  padding: 8px 6px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.weather-time,
+.rain {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.weather-hour h3 {
+  font-size: 22px;
+  line-height: 1;
+  margin: 4px 0 3px;
+}
+
+.event {
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: 7px 86px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.event-rail {
+  width: 100%;
+}
+
+.event-date {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  font-size: 16px;
+  font-weight: 800;
+  border-right: 1px solid var(--line);
+}
+
+.event-main {
+  padding: 12px 16px;
+  min-width: 0;
+}
+
+.event-main h3,
+.task h3 {
+  font-size: 20px;
+  line-height: 1.16;
+  overflow-wrap: anywhere;
+}
+
+.event-main p,
+.task p {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+.event-main .leave {
+  color: var(--alert);
+  font-weight: 800;
+}
+
+.task {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+}
+
+.task-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.task-title-row h3 {
+  min-width: 0;
+}
+
+.task-status {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.task.high {
+  border-color: color-mix(in srgb, var(--alert), var(--line) 45%);
+}
+
+.check {
+  width: 21px;
+  height: 21px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  margin-top: 3px;
+}
+
+.task.status-progress .check {
+  border-color: #ffd166;
+  background: #ffd166;
+}
+
+.task.status-progress .task-status {
+  color: #ffd166;
+}
+
+.task.status-completed .check {
+  border-color: #62d26f;
+  background: #62d26f;
+}
+
+.task.status-completed .task-status {
+  color: #62d26f;
+}
+
+.empty {
+  color: var(--muted);
+  padding: 16px;
+  font-size: 16px;
+}
+
+.status {
+  height: 16px;
+  color: var(--alert);
+  font-size: 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.news-strip {
+  min-width: 0;
+  height: 36px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  overflow: hidden;
+  background: var(--panel-strong);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.news-label {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 0 14px;
+  color: #111512;
+  background: var(--accent);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.ticker-window {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.ticker-track {
+  width: max-content;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  animation: ticker-scroll 70s linear infinite;
+}
+
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ticker-item::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin: 0 22px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .topbar,
+  .content,
+  .weather-list {
+    grid-template-columns: 1fr;
+  }
+
+  h1,
+  .clock {
+    font-size: 48px;
+  }
+}

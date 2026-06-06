@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HomeNote</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="background-layer active" id="bg-a"></div>
+    <div class="background-layer" id="bg-b"></div>
+    <main class="dashboard">
+      <section class="topbar">
+        <div>
+          <p class="eyebrow" id="date">Loading</p>
+          <h1 id="title">HomeNote</h1>
+        </div>
+        <div class="clock" id="clock">--:--</div>
+      </section>
+
+      <section class="weather">
+        <div class="section-heading">
+          <h2>Weather</h2>
+          <span>Next 12 hours</span>
+        </div>
+        <div id="weather" class="weather-list"></div>
+      </section>
+
+      <section class="content">
+        <section class="agenda">
+          <div class="section-heading">
+            <h2>Calendar</h2>
+            <span id="event-count">0 events</span>
+          </div>
+          <div id="events" class="event-list"></div>
+        </section>
+
+        <aside class="right-stack">
+          <section class="tasks">
+            <div class="section-heading">
+              <h2>Tasks</h2>
+              <span id="task-count">0 open</span>
+            </div>
+            <div id="tasks" class="task-list"></div>
+          </section>
+
+          <section class="homework">
+            <div class="section-heading">
+              <h2>Homework</h2>
+              <span id="homework-count">0 open</span>
+            </div>
+            <div id="homework" class="task-list"></div>
+          </section>
+        </aside>
+      </section>
+
+      <p class="status" id="status"></p>
+      <section class="news-strip" aria-label="Today's headlines">
+        <div class="news-label">Today</div>
+        <div class="ticker-window">
+          <div class="ticker-track" id="news-ticker">
+            <span class="ticker-item">Loading headlines...</span>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

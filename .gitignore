@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.vendor/
+
+config.json
+*.local.json
+*.secret.json
+.env
+
+.DS_Store
+Thumbs.db
+
+.vscode/
+*.code-workspace
+

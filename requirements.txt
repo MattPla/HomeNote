@@ -1,0 +1,8 @@
+Flask>=3.0,<4
+icalendar>=5.0,<6
+recurring-ical-events>=2.0,<4
+requests>=2.31,<3
+Pillow>=10,<13
+gpiozero>=2,<3
+lgpio>=0.2,<1
+waveshare-epaper>=1.4,<2
