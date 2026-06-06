@@ -4,6 +4,8 @@ HomeNote is a Raspberry Pi TV dashboard for a household calendar, tasks, homewor
 
 It was built for a Raspberry Pi Zero 2 W connected to a TV, with optional Waveshare 2.13-inch e-paper status display support.
 
+![HomeNote running on a TV with e-paper Pi status display](docs/images/homenote-dashboard.jpg)
+
 ## Features
 
 - Full-screen TV kiosk with no scrolling
@@ -205,4 +207,3 @@ git branch -M main
 git remote add origin https://github.com/YOUR_USER/homenote.git
 git push -u origin main
 ```
-
