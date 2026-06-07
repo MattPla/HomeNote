@@ -1,6 +1,10 @@
 const state = {
   timezone: "America/New_York",
   backgroundIndex: 0,
+  notes: [],
+  selectedNoteId: null,
+  noteColor: "#fff2a8",
+  noteZ: 10,
 };
 
 const backgrounds = [
@@ -8,6 +12,8 @@ const backgrounds = [
   "/static/backgrounds/kitchen-garden.png",
   "/static/backgrounds/evening-patio.png",
 ];
+
+const notesStorageKey = "homenote.stickyNotes.v1";
 
 function formatDateTime(value, options) {
   return new Intl.DateTimeFormat("en-US", {
@@ -191,6 +197,241 @@ function renderNews(headlines) {
   container.innerHTML = `${items}${items}`;
 }
 
+function loadNotes() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(notesStorageKey) || "[]");
+    state.notes = Array.isArray(saved) ? saved : [];
+    state.noteZ = state.notes.reduce((max, note) => Math.max(max, note.z || 10), 10);
+  } catch {
+    state.notes = [];
+  }
+
+  if (!state.notes.length) {
+    state.notes = [
+      createNoteData({
+        x: 42,
+        y: 34,
+        width: 260,
+        height: 180,
+        text: "Family note",
+        color: "#fff2a8",
+      }),
+    ];
+  }
+  renderNotes();
+}
+
+function createNoteData(overrides = {}) {
+  return {
+    id: overrides.id || `note-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+    x: overrides.x ?? 48,
+    y: overrides.y ?? 48,
+    width: overrides.width ?? 250,
+    height: overrides.height ?? 170,
+    color: overrides.color || state.noteColor,
+    text: overrides.text || "",
+    z: overrides.z || ++state.noteZ,
+  };
+}
+
+function saveNotes() {
+  localStorage.setItem(notesStorageKey, JSON.stringify(state.notes));
+}
+
+function renderNotes() {
+  const canvas = document.getElementById("notes-canvas");
+  canvas.innerHTML = state.notes.map(noteTemplate).join("");
+  for (const element of canvas.querySelectorAll(".sticky-note")) {
+    bindNote(element);
+  }
+}
+
+function noteTemplate(note) {
+  const selected = note.id === state.selectedNoteId ? " selected" : "";
+  return `
+    <article class="sticky-note${selected}" data-note-id="${escapeHtml(note.id)}" style="--note-color:${escapeHtml(note.color)}; left:${note.x}px; top:${note.y}px; width:${note.width}px; height:${note.height}px; z-index:${note.z || 10};">
+      <div class="note-grip">
+        <span></span>
+        <span></span>
+      </div>
+      <div class="note-body" contenteditable="true" spellcheck="true">${escapeHtml(note.text)}</div>
+      <div class="note-resize" title="Resize" aria-hidden="true"></div>
+    </article>
+  `;
+}
+
+function bindNote(element) {
+  const noteId = element.dataset.noteId;
+  const body = element.querySelector(".note-body");
+  const grip = element.querySelector(".note-grip");
+  const resize = element.querySelector(".note-resize");
+
+  element.addEventListener("pointerdown", () => selectNote(noteId));
+  body.addEventListener("input", () => {
+    const note = findNote(noteId);
+    if (!note) return;
+    note.text = body.innerText;
+    saveNotes();
+  });
+  grip.addEventListener("pointerdown", (event) => startDrag(event, noteId));
+  resize.addEventListener("pointerdown", (event) => startResize(event, noteId));
+}
+
+function findNote(noteId) {
+  return state.notes.find((note) => note.id === noteId);
+}
+
+function selectNote(noteId, shouldRender = true) {
+  const note = findNote(noteId);
+  if (!note) return;
+  state.selectedNoteId = noteId;
+  note.z = ++state.noteZ;
+  state.noteColor = note.color;
+  syncSwatches();
+  saveNotes();
+  if (shouldRender) {
+    renderNotes();
+  } else {
+    document.querySelectorAll(".sticky-note").forEach((item) => {
+      item.classList.toggle("selected", item.dataset.noteId === noteId);
+    });
+  }
+}
+
+function addNote() {
+  const canvas = document.getElementById("notes-canvas");
+  const offset = Math.min(state.notes.length * 18, 140);
+  const note = createNoteData({
+    x: Math.max(24, Math.min(64 + offset, canvas.clientWidth - 280)),
+    y: Math.max(24, Math.min(42 + offset, canvas.clientHeight - 190)),
+  });
+  state.notes.push(note);
+  state.selectedNoteId = note.id;
+  saveNotes();
+  renderNotes();
+  focusSelectedNote();
+}
+
+function deleteSelectedNote() {
+  if (!state.selectedNoteId) return;
+  state.notes = state.notes.filter((note) => note.id !== state.selectedNoteId);
+  state.selectedNoteId = state.notes.at(-1)?.id || null;
+  saveNotes();
+  renderNotes();
+}
+
+function focusSelectedNote() {
+  requestAnimationFrame(() => {
+    const note = document.querySelector(`[data-note-id="${CSS.escape(state.selectedNoteId)}"] .note-body`);
+    note?.focus();
+  });
+}
+
+function setNoteColor(color) {
+  state.noteColor = color;
+  const note = findNote(state.selectedNoteId);
+  if (note) {
+    note.color = color;
+    saveNotes();
+    renderNotes();
+  }
+  syncSwatches();
+}
+
+function syncSwatches() {
+  for (const swatch of document.querySelectorAll("[data-note-color]")) {
+    swatch.classList.toggle("active", swatch.dataset.noteColor === state.noteColor);
+  }
+}
+
+function startDrag(event, noteId) {
+  event.preventDefault();
+  const note = findNote(noteId);
+  const canvas = document.getElementById("notes-canvas");
+  if (!note) return;
+  selectNote(noteId, false);
+  const startX = event.clientX;
+  const startY = event.clientY;
+  const originX = note.x;
+  const originY = note.y;
+  event.currentTarget.setPointerCapture(event.pointerId);
+
+  const move = (moveEvent) => {
+    note.x = clamp(originX + moveEvent.clientX - startX, 0, canvas.clientWidth - note.width);
+    note.y = clamp(originY + moveEvent.clientY - startY, 0, canvas.clientHeight - note.height);
+    updateNoteElement(note);
+  };
+  const up = () => {
+    saveNotes();
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+}
+
+function startResize(event, noteId) {
+  event.preventDefault();
+  const note = findNote(noteId);
+  const canvas = document.getElementById("notes-canvas");
+  if (!note) return;
+  selectNote(noteId, false);
+  const startX = event.clientX;
+  const startY = event.clientY;
+  const originWidth = note.width;
+  const originHeight = note.height;
+  event.currentTarget.setPointerCapture(event.pointerId);
+
+  const move = (moveEvent) => {
+    note.width = clamp(originWidth + moveEvent.clientX - startX, 170, canvas.clientWidth - note.x);
+    note.height = clamp(originHeight + moveEvent.clientY - startY, 120, canvas.clientHeight - note.y);
+    updateNoteElement(note);
+  };
+  const up = () => {
+    saveNotes();
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+}
+
+function updateNoteElement(note) {
+  const element = document.querySelector(`[data-note-id="${CSS.escape(note.id)}"]`);
+  if (!element) return;
+  element.style.left = `${note.x}px`;
+  element.style.top = `${note.y}px`;
+  element.style.width = `${note.width}px`;
+  element.style.height = `${note.height}px`;
+  element.style.zIndex = note.z;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function toggleNotesMode() {
+  const dashboard = document.querySelector(".dashboard");
+  const toggle = document.getElementById("notes-toggle");
+  const isOpen = dashboard.classList.toggle("notes-open");
+  toggle.setAttribute("aria-pressed", String(isOpen));
+  if (isOpen) {
+    renderNotes();
+  }
+}
+
+function initNotes() {
+  loadNotes();
+  document.getElementById("notes-toggle").addEventListener("click", toggleNotesMode);
+  document.getElementById("add-note").addEventListener("click", addNote);
+  document.getElementById("delete-note").addEventListener("click", deleteSelectedNote);
+  for (const swatch of document.querySelectorAll("[data-note-color]")) {
+    swatch.style.background = swatch.dataset.noteColor;
+    swatch.addEventListener("click", () => setNoteColor(swatch.dataset.noteColor));
+  }
+  syncSwatches();
+}
+
 function rotateBackground() {
   const layers = [document.getElementById("bg-a"), document.getElementById("bg-b")];
   const active = state.backgroundIndex % 2;
@@ -246,6 +487,7 @@ async function refresh() {
 document.getElementById("bg-a").style.backgroundImage = `url("${backgrounds[0]}")`;
 document.getElementById("bg-a").classList.add("active");
 state.backgroundIndex = 1;
+initNotes();
 updateClock();
 refresh();
 setInterval(updateClock, 1000);

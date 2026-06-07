@@ -15,7 +15,32 @@
           <p class="eyebrow" id="date">Loading</p>
           <h1 id="title">HomeNote</h1>
         </div>
-        <div class="clock" id="clock">--:--</div>
+        <div class="top-actions">
+          <div class="note-controls" id="note-controls" aria-label="Sticky note controls">
+            <button class="icon-button" id="add-note" type="button" title="Add note" aria-label="Add note">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+            </button>
+            <div class="color-picker" aria-label="Note colors">
+              <button class="swatch active" type="button" data-note-color="#fff2a8" title="Yellow" aria-label="Yellow note"></button>
+              <button class="swatch" type="button" data-note-color="#c8f7dc" title="Green" aria-label="Green note"></button>
+              <button class="swatch" type="button" data-note-color="#b9e7ff" title="Blue" aria-label="Blue note"></button>
+              <button class="swatch" type="button" data-note-color="#ffd1dc" title="Pink" aria-label="Pink note"></button>
+              <button class="swatch" type="button" data-note-color="#f3d2ff" title="Purple" aria-label="Purple note"></button>
+            </div>
+            <button class="icon-button" id="delete-note" type="button" title="Delete note" aria-label="Delete note">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15M10 11v6M14 11v6"></path></svg>
+            </button>
+          </div>
+          <button class="mode-button" id="notes-toggle" type="button" aria-pressed="false" title="Sticky notes">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"></path><path d="M15 3v4h4M9 11h6M9 15h4"></path></svg>
+            <span>Notes</span>
+          </button>
+          <div class="clock" id="clock">--:--</div>
+        </div>
+      </section>
+
+      <section class="notes-board" id="notes-board" aria-label="Sticky note canvas">
+        <div class="notes-canvas" id="notes-canvas"></div>
       </section>
 
       <section class="weather">
