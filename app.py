@@ -14,9 +14,9 @@ from typing import Any
 import recurring_ical_events
 import requests
 from flask import Flask, jsonify, render_template
+from google.auth.transport.requests import AuthorizedSession
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build as build_google_service
 from icalendar import Calendar
 from zoneinfo import ZoneInfo
 
@@ -163,22 +163,23 @@ def fetch_google_calendar_events(
     if not credentials_path.exists() and not creds.refresh_token:
         raise FileNotFoundError(f"missing OAuth client credentials file: {credentials_path}")
 
-    service = build_google_service("calendar", "v3", credentials=creds, cache_discovery=False)
-    response = (
-        service.events()
-        .list(
-            calendarId=calendar_id,
-            timeMin=day_start.isoformat(),
-            timeMax=horizon.isoformat(),
-            singleEvents=True,
-            orderBy="startTime",
-            maxResults=60,
-        )
-        .execute()
+    session = AuthorizedSession(creds)
+    response = session.get(
+        f"https://www.googleapis.com/calendar/v3/calendars/{quote(calendar_id, safe='')}/events",
+        params={
+            "timeMin": day_start.isoformat(),
+            "timeMax": horizon.isoformat(),
+            "singleEvents": "true",
+            "orderBy": "startTime",
+            "maxResults": 60,
+        },
+        timeout=15,
     )
+    response.raise_for_status()
+    payload = response.json()
 
     events = []
-    for item in response.get("items", []):
+    for item in payload.get("items", []):
         raw_start = item.get("start", {})
         raw_end = item.get("end", raw_start)
         start = parse_google_event_time(raw_start, tz)

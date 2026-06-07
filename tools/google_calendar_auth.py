@@ -21,6 +21,12 @@ def main() -> int:
         default="google-token.json",
         help="Where to save the authorized token JSON.",
     )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Localhost port for the OAuth callback.",
+    )
     args = parser.parse_args()
 
     credentials_path = Path(args.credentials)
@@ -30,7 +36,7 @@ def main() -> int:
         return 1
 
     flow = InstalledAppFlow.from_client_secrets_file(str(credentials_path), SCOPES)
-    creds = flow.run_local_server(port=0)
+    creds = flow.run_local_server(port=args.port)
     token_path.write_text(creds.to_json(), encoding="utf-8")
     print(f"Saved Google Calendar token to {token_path}")
     return 0
@@ -38,4 +44,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
