@@ -249,5 +249,5 @@ state.backgroundIndex = 1;
 updateClock();
 refresh();
 setInterval(updateClock, 1000);
-setInterval(refresh, 5 * 60 * 1000);
+setInterval(refresh, 60 * 1000);
 setInterval(rotateBackground, 60 * 1000);

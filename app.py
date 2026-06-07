@@ -8,6 +8,7 @@ import os
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import parse_qs, quote, urlparse
 from typing import Any
 
 import recurring_ical_events
@@ -47,11 +48,13 @@ def coerce_datetime(value: Any, tz: ZoneInfo) -> datetime:
     return dt.astimezone(tz)
 
 
-def fetch_calendar_events(config: dict[str, Any]) -> list[dict[str, Any]]:
+def fetch_calendar_events(config: dict[str, Any]) -> tuple[list[dict[str, Any]], str | None]:
     tz = ZoneInfo(config.get("timezone", "America/New_York"))
     now = datetime.now(tz)
-    horizon = now + timedelta(days=int(config.get("days_ahead", 14)))
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    horizon = day_start + timedelta(days=int(config.get("days_ahead", 1)))
     events: list[dict[str, Any]] = []
+    errors: list[str] = []
 
     for event_config in config.get("events", []):
         start_value = event_config.get("start")
@@ -61,7 +64,7 @@ def fetch_calendar_events(config: dict[str, Any]) -> list[dict[str, Any]]:
         start = datetime.fromisoformat(start_value).astimezone(tz)
         end_value = event_config.get("end", start_value)
         end = datetime.fromisoformat(end_value).astimezone(tz)
-        if end < now or start > horizon:
+        if not event_overlaps_range(start, end, day_start, horizon):
             continue
 
         events.append(
@@ -79,24 +82,34 @@ def fetch_calendar_events(config: dict[str, Any]) -> list[dict[str, Any]]:
         )
 
     for calendar_config in config.get("calendars", []):
-        url = calendar_config.get("url")
+        url = normalize_calendar_url(calendar_config)
         if not url or "YOUR_PRIVATE_ICAL_URL" in url:
             continue
 
-        response = requests.get(url, timeout=15)
-        response.raise_for_status()
-        calendar = Calendar.from_ical(response.text)
         color = calendar_config.get("color", "#2f7d6d")
         name = calendar_config.get("name", "Calendar")
+        try:
+            response = requests.get(url, timeout=15)
+            response.raise_for_status()
+            calendar = Calendar.from_ical(response.text)
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 404:
+                errors.append(f"{name}: calendar feed is not public or the iCal URL is not valid")
+            else:
+                errors.append(f"{name}: {exc}")
+            continue
+        except Exception as exc:
+            errors.append(f"{name}: {exc}")
+            continue
 
-        for component in recurring_ical_events.of(calendar).between(now, horizon):
+        for component in recurring_ical_events.of(calendar).between(day_start, horizon):
             if component.name != "VEVENT":
                 continue
 
             raw_start = component.decoded("DTSTART")
             start = coerce_datetime(raw_start, tz)
             end = coerce_datetime(component.decoded("DTEND", raw_start), tz)
-            if end < now:
+            if not event_overlaps_range(start, end, day_start, horizon):
                 continue
 
             events.append(
@@ -110,7 +123,26 @@ def fetch_calendar_events(config: dict[str, Any]) -> list[dict[str, Any]]:
                 }
             )
 
-    return sorted(events, key=lambda event: event["start"])[:60]
+    return sorted(events, key=lambda event: event["start"])[:60], "; ".join(errors) or None
+
+
+def event_overlaps_range(start: datetime, end: datetime, range_start: datetime, range_end: datetime) -> bool:
+    return start < range_end and end > range_start
+
+
+def normalize_calendar_url(calendar_config: dict[str, Any]) -> str:
+    url = calendar_config.get("url", "").strip()
+    calendar_id = calendar_config.get("id", "").strip()
+    if calendar_id:
+        return f"https://calendar.google.com/calendar/ical/{quote(calendar_id, safe='')}/public/basic.ics"
+
+    parsed = urlparse(url)
+    if "calendar.google.com" in parsed.netloc and parsed.path.endswith("/calendar/embed"):
+        src = parse_qs(parsed.query).get("src", [""])[0]
+        if src:
+            return f"https://calendar.google.com/calendar/ical/{quote(src, safe='')}/public/basic.ics"
+
+    return url
 
 
 DONE_STATUSES = {"done", "complete", "completed", "finished", "closed", "true", "yes"}
@@ -411,8 +443,7 @@ def index():
 def dashboard():
     config = load_config()
     try:
-        events = fetch_calendar_events(config)
-        calendar_error = None
+        events, calendar_error = fetch_calendar_events(config)
     except Exception as exc:  # Keep the TV usable if one feed fails.
         events = []
         calendar_error = str(exc)
