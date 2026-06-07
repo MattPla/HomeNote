@@ -14,12 +14,16 @@ from typing import Any
 import recurring_ical_events
 import requests
 from flask import Flask, jsonify, render_template
+from google.auth.transport.requests import Request as GoogleAuthRequest
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build as build_google_service
 from icalendar import Calendar
 from zoneinfo import ZoneInfo
 
 
 APP_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = Path(os.environ.get("HOMENOTE_CONFIG", APP_DIR / "config.json"))
+GOOGLE_CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 app = Flask(__name__)
 
@@ -82,6 +86,14 @@ def fetch_calendar_events(config: dict[str, Any]) -> tuple[list[dict[str, Any]],
         )
 
     for calendar_config in config.get("calendars", []):
+        if calendar_config.get("provider") == "google_api":
+            try:
+                events.extend(fetch_google_calendar_events(calendar_config, tz, day_start, horizon))
+            except Exception as exc:
+                name = calendar_config.get("name", "Google Calendar")
+                errors.append(f"{name}: {exc}")
+            continue
+
         url = normalize_calendar_url(calendar_config)
         if not url or "YOUR_PRIVATE_ICAL_URL" in url:
             continue
@@ -124,6 +136,80 @@ def fetch_calendar_events(config: dict[str, Any]) -> tuple[list[dict[str, Any]],
             )
 
     return sorted(events, key=lambda event: event["start"])[:60], "; ".join(errors) or None
+
+
+def fetch_google_calendar_events(
+    calendar_config: dict[str, Any],
+    tz: ZoneInfo,
+    day_start: datetime,
+    horizon: datetime,
+) -> list[dict[str, Any]]:
+    token_path = Path(calendar_config.get("token_path", APP_DIR / "google-token.json"))
+    credentials_path = Path(calendar_config.get("credentials_path", APP_DIR / "google-credentials.json"))
+    calendar_id = calendar_config.get("id") or calendar_config.get("calendar_id") or "primary"
+    name = calendar_config.get("name", "Google Calendar")
+    color = calendar_config.get("color", "#2f7d6d")
+
+    if not token_path.exists():
+        raise FileNotFoundError(f"missing OAuth token file: {token_path}")
+
+    creds = Credentials.from_authorized_user_file(str(token_path), GOOGLE_CALENDAR_SCOPES)
+    if creds.expired and creds.refresh_token:
+        creds.refresh(GoogleAuthRequest())
+        token_path.write_text(creds.to_json(), encoding="utf-8")
+    if not creds.valid:
+        raise RuntimeError("OAuth token is invalid; rerun the Google Calendar auth helper")
+
+    if not credentials_path.exists() and not creds.refresh_token:
+        raise FileNotFoundError(f"missing OAuth client credentials file: {credentials_path}")
+
+    service = build_google_service("calendar", "v3", credentials=creds, cache_discovery=False)
+    response = (
+        service.events()
+        .list(
+            calendarId=calendar_id,
+            timeMin=day_start.isoformat(),
+            timeMax=horizon.isoformat(),
+            singleEvents=True,
+            orderBy="startTime",
+            maxResults=60,
+        )
+        .execute()
+    )
+
+    events = []
+    for item in response.get("items", []):
+        raw_start = item.get("start", {})
+        raw_end = item.get("end", raw_start)
+        start = parse_google_event_time(raw_start, tz)
+        end = parse_google_event_time(raw_end, tz)
+        if not event_overlaps_range(start, end, day_start, horizon):
+            continue
+
+        events.append(
+            {
+                "title": item.get("summary", "Untitled event"),
+                "calendar": name,
+                "color": color,
+                "start": start.isoformat(),
+                "end": end.isoformat(),
+                "allDay": "date" in raw_start,
+                "location": item.get("location", ""),
+                "leaveBy": "",
+                "travelMinutes": None,
+            }
+        )
+
+    return events
+
+
+def parse_google_event_time(value: dict[str, str], tz: ZoneInfo) -> datetime:
+    if value.get("dateTime"):
+        dt = datetime.fromisoformat(value["dateTime"].replace("Z", "+00:00"))
+        return dt.astimezone(tz)
+    if value.get("date"):
+        return datetime.fromisoformat(value["date"]).replace(tzinfo=tz)
+    return datetime.now(tz)
 
 
 def event_overlaps_range(start: datetime, end: datetime, range_start: datetime, range_end: datetime) -> bool:

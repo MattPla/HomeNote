@@ -7,6 +7,14 @@
       "name": "Family",
       "url": "https://calendar.google.com/calendar/ical/YOUR_PRIVATE_OR_PUBLIC_ICAL_URL/basic.ics",
       "color": "#4c91d9"
+    },
+    {
+      "name": "Shared Calendar",
+      "provider": "google_api",
+      "id": "shared-calendar@example.com",
+      "credentials_path": "/home/pi/homenote/google-credentials.json",
+      "token_path": "/home/pi/homenote/google-token.json",
+      "color": "#4c91d9"
     }
   ],
   "task_sheet": {

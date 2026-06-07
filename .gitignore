@@ -8,10 +8,13 @@ config.json
 *.local.json
 *.secret.json
 .env
+google-credentials.json
+google-token.json
+token.json
+credentials.json
 
 .DS_Store
 Thumbs.db
 
 .vscode/
 *.code-workspace
-

@@ -10,6 +10,7 @@ It was built for a Raspberry Pi Zero 2 W connected to a TV, with optional Wavesh
 
 - Full-screen TV kiosk with no scrolling
 - Google Calendar iCal feed support
+- Google Calendar API OAuth support for private/shared calendars
 - Google Sheets task list support
 - Separate homework sheet support
 - Rolling 12-hour weather forecast from Open-Meteo
@@ -45,7 +46,15 @@ The dashboard runs at `http://localhost:8765` on the Pi.
 
 ## Google Calendar
 
-HomeNote reads Google Calendar through an iCal URL.
+HomeNote can read Google Calendar two ways: an iCal URL, or the Google Calendar API using your authorized Google account.
+
+Use the Google Calendar API option when a shared calendar only works while you are logged in, such as:
+
+```text
+https://calendar.google.com/calendar/u/0/embed?src=shared-calendar@example.com
+```
+
+### Option 1: iCal URL
 
 1. Open Google Calendar in a browser.
 2. Click the gear icon, then **Settings**.
@@ -66,6 +75,45 @@ HomeNote reads Google Calendar through an iCal URL.
 ```
 
 You can add more than one calendar object.
+
+### Option 2: Google Calendar API
+
+1. Create an OAuth desktop client in Google Cloud and download it as `google-credentials.json`.
+2. Put `google-credentials.json` in this project folder on your computer.
+3. Install the Python requirements locally.
+4. Run:
+
+```powershell
+python tools\google_calendar_auth.py --credentials google-credentials.json --token google-token.json
+```
+
+5. Sign in with the Google account that can see the shared calendar.
+6. Copy both files to the Pi:
+
+```powershell
+scp google-credentials.json google-token.json pi@homenote.local:/home/pi/homenote/
+```
+
+7. Configure the calendar in `~/homenote/config.json`:
+
+```json
+"calendars": [
+  {
+    "name": "Family",
+    "provider": "google_api",
+    "id": "shared-calendar@example.com",
+    "credentials_path": "/home/pi/homenote/google-credentials.json",
+    "token_path": "/home/pi/homenote/google-token.json",
+    "color": "#4c91d9"
+  }
+]
+```
+
+Restart HomeNote after editing config:
+
+```bash
+sudo systemctl restart homenote.service
+```
 
 ## Google Sheets Tasks
 
