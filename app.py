@@ -27,11 +27,15 @@ from zoneinfo import ZoneInfo
 APP_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = Path(os.environ.get("HOMENOTE_CONFIG", APP_DIR / "config.json"))
 NOTES_PATH = Path(os.environ.get("HOMENOTE_NOTES", APP_DIR / "notes.json"))
+NEWS_CACHE_PATH = Path(os.environ.get("HOMENOTE_NEWS_CACHE", APP_DIR / "news-cache.json"))
+MARKET_CACHE_PATH = Path(os.environ.get("HOMENOTE_MARKET_CACHE", APP_DIR / "market-cache.json"))
 GOOGLE_CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 app = Flask(__name__)
 notes_lock = threading.Lock()
 config_lock = threading.Lock()
+news_lock = threading.Lock()
+market_lock = threading.Lock()
 
 DEFAULT_CONFIG = {
     "timezone": "America/New_York",
@@ -45,6 +49,9 @@ DEFAULT_CONFIG = {
         "latitude": 28.176856,
         "longitude": -82.67127,
         "label": "Home",
+    },
+    "markets": {
+        "symbols": ["SPY", "DIA", "QQQ", "AAPL"],
     },
 }
 
@@ -91,6 +98,56 @@ def save_notes(notes: list[dict[str, Any]]) -> float:
         temp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         temp_path.replace(NOTES_PATH)
         return NOTES_PATH.stat().st_mtime
+
+
+def load_news_cache() -> list[dict[str, str]]:
+    with news_lock:
+        if not NEWS_CACHE_PATH.exists():
+            return []
+        try:
+            with NEWS_CACHE_PATH.open("r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return []
+    headlines = payload.get("headlines", []) if isinstance(payload, dict) else []
+    return headlines if isinstance(headlines, list) else []
+
+
+def save_news_cache(headlines: list[dict[str, str]]) -> None:
+    payload = {
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "headlines": headlines[:40],
+    }
+    with news_lock:
+        NEWS_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = NEWS_CACHE_PATH.with_suffix(".tmp")
+        temp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        temp_path.replace(NEWS_CACHE_PATH)
+
+
+def load_market_cache() -> list[dict[str, Any]]:
+    with market_lock:
+        if not MARKET_CACHE_PATH.exists():
+            return []
+        try:
+            with MARKET_CACHE_PATH.open("r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except (OSError, json.JSONDecodeError):
+            return []
+    quotes = payload.get("quotes", []) if isinstance(payload, dict) else []
+    return quotes if isinstance(quotes, list) else []
+
+
+def save_market_cache(quotes: list[dict[str, Any]]) -> None:
+    payload = {
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "quotes": quotes[:8],
+    }
+    with market_lock:
+        MARKET_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = MARKET_CACHE_PATH.with_suffix(".tmp")
+        temp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        temp_path.replace(MARKET_CACHE_PATH)
 
 
 def sanitize_note(note: dict[str, Any]) -> dict[str, Any]:
@@ -766,7 +823,10 @@ def fetch_news(config: dict[str, Any]) -> list[dict[str, str]]:
         if len(headlines) >= limit:
             break
 
-    return headlines
+    if headlines:
+        save_news_cache(headlines)
+        return headlines
+    return load_news_cache()
 
 
 def extract_news_image(item: ET.Element) -> str:
@@ -787,6 +847,87 @@ def extract_news_image(item: ET.Element) -> str:
     )
     match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', text, flags=re.IGNORECASE)
     return unescape(match.group(1)) if match else ""
+
+
+def fetch_markets(config: dict[str, Any]) -> list[dict[str, Any]]:
+    market_config = config.get("markets", {})
+    symbols = market_config.get("symbols") or ["SPY", "DIA", "QQQ", "AAPL"]
+    symbols = [str(symbol).strip().upper().replace(".US", "") for symbol in symbols if str(symbol).strip()][:6]
+    if not symbols:
+        return []
+
+    quotes = []
+    for symbol in symbols:
+        quote = fetch_nasdaq_quote(symbol)
+        if quote:
+            quotes.append(quote)
+
+    if quotes:
+        save_market_cache(quotes)
+        return quotes
+    return load_market_cache() or configured_market_quotes(config)
+
+
+def fetch_nasdaq_quote(symbol: str) -> dict[str, Any] | None:
+    response = requests.get(
+        f"https://api.nasdaq.com/api/quote/{quote(symbol, safe='')}/info",
+        params={"assetclass": infer_nasdaq_asset_class(symbol)},
+        timeout=8,
+        headers={
+            "User-Agent": "Mozilla/5.0 HomeNote/1.0",
+            "Accept": "application/json",
+        },
+    )
+    response.raise_for_status()
+    data = response.json().get("data", {})
+    primary = data.get("primaryData", {})
+    price = parse_market_float(primary.get("lastSalePrice"))
+    change = parse_market_float(primary.get("netChange"))
+    percent = parse_market_float(primary.get("percentageChange"))
+    if price is None:
+        return None
+    return {
+        "symbol": symbol,
+        "price": round(price, 2),
+        "change": round(change, 2) if change is not None else None,
+        "changePercent": round(percent, 2) if percent is not None else None,
+    }
+
+
+def infer_nasdaq_asset_class(symbol: str) -> str:
+    if symbol in {"SPY", "DIA", "QQQ", "IWM", "VOO", "VTI"}:
+        return "etf"
+    return "stocks"
+
+
+def parse_market_float(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text or text.upper() in {"N/D", "--"}:
+        return None
+    text = text.replace("$", "").replace(",", "").replace("%", "").replace("+", "")
+    match = re.search(r"-?\d+(?:\.\d+)?", text)
+    if not match:
+        return None
+    try:
+        return float(match.group(0))
+    except ValueError:
+        return None
+
+
+def configured_market_quotes(config: dict[str, Any]) -> list[dict[str, Any]]:
+    quotes = []
+    for item in config.get("markets", {}).get("quotes", []):
+        if not isinstance(item, dict):
+            continue
+        quotes.append(
+            {
+                "symbol": str(item.get("symbol", ""))[:12],
+                "price": item.get("price", "--"),
+                "change": item.get("change"),
+                "changePercent": item.get("changePercent"),
+            }
+        )
+    return quotes
 
 
 @app.get("/")
@@ -827,8 +968,15 @@ def dashboard():
         news = fetch_news(config)
         news_error = None
     except Exception as exc:
-        news = []
+        news = load_news_cache()
         news_error = str(exc)
+
+    try:
+        markets = fetch_markets(config)
+        market_error = None
+    except Exception as exc:
+        markets = load_market_cache() or configured_market_quotes(config)
+        market_error = str(exc)
 
     return jsonify(
         {
@@ -840,11 +988,13 @@ def dashboard():
             "homework": homework,
             "weather": weather,
             "news": news,
+            "markets": markets,
             "calendarError": calendar_error,
             "taskError": task_error,
             "homeworkError": homework_error,
             "weatherError": weather_error,
             "newsError": news_error,
+            "marketError": market_error,
         }
     )
 

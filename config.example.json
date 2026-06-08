@@ -35,6 +35,9 @@
     "rss_url": "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en",
     "limit": 12
   },
+  "markets": {
+    "symbols": ["SPY", "DIA", "QQQ", "AAPL"]
+  },
   "tasks": [
     {
       "title": "Take recycling out",

@@ -14,7 +14,7 @@ It was built for a Raspberry Pi Zero 2 W connected to a TV, with optional Wavesh
 - Google Sheets task list support
 - Separate homework sheet support
 - Rolling 12-hour weather plus 7-day forecast from Open-Meteo
-- Five rotating RSS news panels with optional story images
+- Four rotating RSS news panels plus a daily market summary card
 - Local rotating background images
 - Browser settings panel for calendar, sheets, and location
 - Optional e-paper status display showing hostname, IP, and service status
@@ -192,6 +192,7 @@ Use `config.example.json` as the template. Important fields:
 - `homework_sheet`: homework Google Sheet tab.
 - `weather`: latitude and longitude.
 - `news`: RSS feed and headline limit.
+- `markets`: Stooq symbols for the market summary card.
 - `tasks`: optional manual fallback tasks.
 - `events`: optional manually configured events.
 

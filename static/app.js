@@ -12,6 +12,7 @@ const state = {
   newsIndex: 0,
   newsTimer: null,
   newsSignature: "",
+  markets: [],
 };
 
 const backgrounds = [
@@ -225,6 +226,7 @@ function weatherIcon(name) {
 }
 
 function renderNews(headlines) {
+  if (!headlines.length && state.newsHeadlines.length) return;
   const signature = headlines.map((headline) => `${headline.title}|${headline.image || ""}`).join("::");
   if (signature === state.newsSignature) return;
   state.newsSignature = signature;
@@ -238,11 +240,11 @@ function showNewsPanels() {
   clearTimeout(state.newsTimer);
 
   if (!state.newsHeadlines.length) {
-    container.innerHTML = '<article class="news-card news-empty"><h3>No headlines published yet today.</h3></article>';
+    container.innerHTML = `${emptyNewsCard()}${renderMarketPanel()}`;
     return;
   }
 
-  const cards = Array.from({ length: 5 }, (_, slot) => {
+  const cards = Array.from({ length: 4 }, (_, slot) => {
     const headline = state.newsHeadlines[(state.newsIndex + slot) % state.newsHeadlines.length];
     const image = headline.image ? ` style="--news-image:url('${cssUrl(headline.image)}')"` : "";
     return `
@@ -257,9 +259,53 @@ function showNewsPanels() {
     `;
   }).join("");
 
-  container.innerHTML = cards;
-  state.newsIndex = (state.newsIndex + 5) % state.newsHeadlines.length;
+  container.innerHTML = `${cards}${renderMarketPanel()}`;
+  state.newsIndex = (state.newsIndex + 4) % state.newsHeadlines.length;
   state.newsTimer = setTimeout(showNewsPanels, 2 * 60 * 1000);
+}
+
+function emptyNewsCard() {
+  return '<article class="news-card news-empty"><h3>No headlines published yet today.</h3></article>';
+}
+
+function renderMarkets(markets) {
+  if (Array.isArray(markets) && markets.length) {
+    state.markets = markets;
+  }
+  if (document.getElementById("news-panels")) {
+    showNewsPanels();
+  }
+}
+
+function renderMarketPanel() {
+  const rows = state.markets.length
+    ? state.markets.slice(0, 4).map((quote) => {
+        const change = quote.changePercent ?? quote.change ?? 0;
+        const direction = Number(change) >= 0 ? "up" : "down";
+        const label = quote.changePercent == null ? formatSigned(quote.change) : `${formatSigned(quote.changePercent)}%`;
+        return `
+          <div class="market-row ${direction}">
+            <strong>${escapeHtml(quote.symbol)}</strong>
+            <span>${escapeHtml(quote.price)}</span>
+            <em>${escapeHtml(label)}</em>
+          </div>
+        `;
+      }).join("")
+    : '<div class="market-empty">Market data unavailable</div>';
+
+  return `
+    <article class="news-card market-card">
+      <div class="news-card-content">
+        <p>Markets</p>
+        <div class="market-list">${rows}</div>
+      </div>
+    </article>
+  `;
+}
+
+function formatSigned(value) {
+  const number = Number(value || 0);
+  return `${number >= 0 ? "+" : ""}${number.toFixed(2)}`;
 }
 
 async function loadNotes(force = false) {
@@ -664,12 +710,14 @@ async function refresh() {
     renderHomework(dashboard.homework || []);
     renderWeather(dashboard.weather || []);
     renderNews(dashboard.news || []);
+    renderMarkets(dashboard.markets || []);
     status.textContent = [
       dashboard.calendarError ? `Calendar problem: ${dashboard.calendarError}` : "",
       dashboard.taskError ? `Task problem: ${dashboard.taskError}` : "",
       dashboard.homeworkError ? `Homework problem: ${dashboard.homeworkError}` : "",
       dashboard.weatherError ? `Weather problem: ${dashboard.weatherError}` : "",
       dashboard.newsError ? `News problem: ${dashboard.newsError}` : "",
+      dashboard.marketError ? `Market problem: ${dashboard.marketError}` : "",
     ]
       .filter(Boolean)
       .join("  ");

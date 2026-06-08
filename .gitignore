@@ -6,6 +6,8 @@ venv/
 
 config.json
 notes.json
+news-cache.json
+market-cache.json
 *.local.json
 *.secret.json
 .env
