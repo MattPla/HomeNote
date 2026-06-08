@@ -180,9 +180,9 @@ function renderWeather(weather) {
     .join("");
 
   container.innerHTML = `
-    <div class="weather-divider weather-divider-hourly">Hourly</div>
+    <div class="weather-divider weather-divider-hourly"><span>Hourly</span></div>
     ${hourly}
-    <div class="weather-divider weather-divider-daily">Next 7 days</div>
+    <div class="weather-divider weather-divider-daily"><span>Next</span><span>7 days</span></div>
     ${daily}
   `;
 }
