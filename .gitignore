@@ -5,6 +5,7 @@ venv/
 .vendor/
 
 config.json
+notes.json
 *.local.json
 *.secret.json
 .env

@@ -5,6 +5,9 @@ const state = {
   selectedNoteId: null,
   noteColor: "#fff2a8",
   noteZ: 10,
+  notesVersion: 0,
+  notesSaveTimer: null,
+  notesInteracting: false,
 };
 
 const backgrounds = [
@@ -12,8 +15,6 @@ const backgrounds = [
   "/static/backgrounds/kitchen-garden.png",
   "/static/backgrounds/evening-patio.png",
 ];
-
-const notesStorageKey = "homenote.stickyNotes.v1";
 
 function formatDateTime(value, options) {
   return new Intl.DateTimeFormat("en-US", {
@@ -197,15 +198,21 @@ function renderNews(headlines) {
   container.innerHTML = `${items}${items}`;
 }
 
-function loadNotes() {
+async function loadNotes(force = false) {
+  if (!force && shouldHoldLocalNotes()) return;
+
   try {
-    const saved = JSON.parse(localStorage.getItem(notesStorageKey) || "[]");
-    state.notes = Array.isArray(saved) ? saved : [];
+    const response = await fetch("/api/notes", { cache: "no-store" });
+    const payload = await response.json();
+    if (!force && payload.version === state.notesVersion) return;
+
+    state.notes = Array.isArray(payload.notes) ? payload.notes : [];
+    state.notesVersion = payload.version || 0;
     state.noteZ = state.notes.reduce((max, note) => Math.max(max, note.z || 10), 10);
-  } catch {
-    state.notes = [];
+    renderNotes();
+  } catch (error) {
+    console.warn("Unable to sync sticky notes", error);
   }
-  renderNotes();
 }
 
 function createNoteData(overrides = {}) {
@@ -221,8 +228,35 @@ function createNoteData(overrides = {}) {
   };
 }
 
-function saveNotes() {
-  localStorage.setItem(notesStorageKey, JSON.stringify(state.notes));
+function saveNotes(delay = 250) {
+  clearTimeout(state.notesSaveTimer);
+  state.notesSaveTimer = setTimeout(flushNotes, delay);
+}
+
+async function flushNotes() {
+  clearTimeout(state.notesSaveTimer);
+  state.notesSaveTimer = null;
+
+  try {
+    const response = await fetch("/api/notes", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notes: state.notes }),
+    });
+    const payload = await response.json();
+    if (Array.isArray(payload.notes)) {
+      state.notes = payload.notes;
+    }
+    state.notesVersion = payload.version || state.notesVersion;
+    state.noteZ = state.notes.reduce((max, note) => Math.max(max, note.z || 10), state.noteZ);
+  } catch (error) {
+    console.warn("Unable to save sticky notes", error);
+  }
+}
+
+function shouldHoldLocalNotes() {
+  const activeNote = document.activeElement?.closest?.(".sticky-note");
+  return state.notesInteracting || Boolean(activeNote);
 }
 
 function renderNotes() {
@@ -338,6 +372,7 @@ function startDrag(event, noteId) {
   const note = findNote(noteId);
   const canvas = document.getElementById("notes-canvas");
   if (!note || !canvas) return;
+  state.notesInteracting = true;
   selectNote(noteId, false);
   const startX = event.clientX;
   const startY = event.clientY;
@@ -351,7 +386,8 @@ function startDrag(event, noteId) {
     updateNoteElement(note);
   };
   const up = () => {
-    saveNotes();
+    state.notesInteracting = false;
+    saveNotes(0);
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
   };
@@ -364,6 +400,7 @@ function startResize(event, noteId) {
   const note = findNote(noteId);
   const canvas = document.getElementById("notes-canvas");
   if (!note || !canvas) return;
+  state.notesInteracting = true;
   selectNote(noteId, false);
   const startX = event.clientX;
   const startY = event.clientY;
@@ -377,7 +414,8 @@ function startResize(event, noteId) {
     updateNoteElement(note);
   };
   const up = () => {
-    saveNotes();
+    state.notesInteracting = false;
+    saveNotes(0);
     window.removeEventListener("pointermove", move);
     window.removeEventListener("pointerup", up);
   };
@@ -482,3 +520,4 @@ refresh();
 setInterval(updateClock, 1000);
 setInterval(refresh, 60 * 1000);
 setInterval(rotateBackground, 60 * 1000);
+setInterval(loadNotes, 2000);

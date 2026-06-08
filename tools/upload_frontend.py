@@ -15,7 +15,7 @@ TARGET = os.environ.get("HOMENOTE_PI_TARGET", "homenote.local")
 USER = os.environ.get("HOMENOTE_PI_USER", "pi")
 PASSWORD = os.environ["HOMENOTE_PI_PASSWORD"]
 REMOTE_DIR = os.environ.get("HOMENOTE_PI_APP_DIR", f"/home/{USER}/homenote")
-UPLOADS = ["static", "templates"]
+UPLOADS = ["app.py", "static", "templates"]
 
 
 def connect() -> paramiko.SSHClient:

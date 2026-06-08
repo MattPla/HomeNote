@@ -5,6 +5,7 @@ from email.utils import parsedate_to_datetime
 import io
 import json
 import os
+import threading
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -13,7 +14,7 @@ from typing import Any
 
 import recurring_ical_events
 import requests
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 from google.auth.transport.requests import AuthorizedSession
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.oauth2.credentials import Credentials
@@ -23,9 +24,11 @@ from zoneinfo import ZoneInfo
 
 APP_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = Path(os.environ.get("HOMENOTE_CONFIG", APP_DIR / "config.json"))
+NOTES_PATH = Path(os.environ.get("HOMENOTE_NOTES", APP_DIR / "notes.json"))
 GOOGLE_CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 app = Flask(__name__)
+notes_lock = threading.Lock()
 
 
 def load_config() -> dict[str, Any]:
@@ -39,6 +42,55 @@ def load_config() -> dict[str, Any]:
 
     with CONFIG_PATH.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def load_notes() -> tuple[list[dict[str, Any]], float]:
+    with notes_lock:
+        if not NOTES_PATH.exists():
+            return [], 0
+
+        with NOTES_PATH.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        notes = payload.get("notes", []) if isinstance(payload, dict) else payload
+        if not isinstance(notes, list):
+            notes = []
+        return notes, NOTES_PATH.stat().st_mtime
+
+
+def save_notes(notes: list[dict[str, Any]]) -> float:
+    sanitized = [sanitize_note(note) for note in notes if isinstance(note, dict)]
+    payload = {
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "notes": sanitized[:80],
+    }
+
+    with notes_lock:
+        NOTES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = NOTES_PATH.with_suffix(".tmp")
+        temp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        temp_path.replace(NOTES_PATH)
+        return NOTES_PATH.stat().st_mtime
+
+
+def sanitize_note(note: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(note.get("id") or f"note-{datetime.now(timezone.utc).timestamp()}"),
+        "x": clamp_number(note.get("x"), 0, 10000, 48),
+        "y": clamp_number(note.get("y"), 0, 10000, 48),
+        "width": clamp_number(note.get("width"), 120, 1200, 250),
+        "height": clamp_number(note.get("height"), 90, 900, 170),
+        "color": str(note.get("color") or "#fff2a8")[:24],
+        "text": str(note.get("text") or "")[:3000],
+        "z": clamp_number(note.get("z"), 1, 1000000, 10),
+    }
+
+
+def clamp_number(value: Any, minimum: int, maximum: int, fallback: int) -> int:
+    try:
+        number = int(float(value))
+    except (TypeError, ValueError):
+        return fallback
+    return max(minimum, min(maximum, number))
 
 
 def coerce_datetime(value: Any, tz: ZoneInfo) -> datetime:
@@ -579,6 +631,23 @@ def dashboard():
             "newsError": news_error,
         }
     )
+
+
+@app.get("/api/notes")
+def get_notes():
+    notes, version = load_notes()
+    return jsonify({"notes": notes, "version": version})
+
+
+@app.put("/api/notes")
+def put_notes():
+    payload = request.get_json(silent=True) or {}
+    notes = payload.get("notes", [])
+    if not isinstance(notes, list):
+        return jsonify({"error": "notes must be a list"}), 400
+
+    version = save_notes(notes)
+    return jsonify({"notes": notes, "version": version})
 
 
 if __name__ == "__main__":
