@@ -630,8 +630,9 @@ h1 {
 
 .ticker-window {
   min-width: 0;
+  height: 100%;
   overflow: hidden;
-  contain: strict;
+  contain: paint;
   transform: translate3d(0, 0, 0);
 }
 

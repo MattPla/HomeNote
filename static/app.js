@@ -188,7 +188,7 @@ function weatherIcon(name) {
 function renderNews(headlines) {
   const container = document.getElementById("news-ticker");
   if (!headlines.length) {
-    container.innerHTML = '<span class="ticker-item">No headlines published yet today.</span>';
+    container.innerHTML = '<span class="ticker-group"><span class="ticker-item">No headlines published yet today.</span></span>';
     syncTickerDistance();
     return;
   }
@@ -209,7 +209,7 @@ function syncTickerDistance() {
     const firstGroup = track?.querySelector(".ticker-group");
     if (!track || !firstGroup) return;
 
-    const distance = firstGroup.scrollWidth;
+    const distance = firstGroup.scrollWidth || track.scrollWidth || 800;
     track.style.setProperty("--ticker-distance", `${distance}px`);
     track.style.setProperty("--ticker-duration", `${Math.max(80, Math.round(distance / 24))}s`);
     track.classList.remove("ticker-ready");
