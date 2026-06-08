@@ -189,13 +189,32 @@ function renderNews(headlines) {
   const container = document.getElementById("news-ticker");
   if (!headlines.length) {
     container.innerHTML = '<span class="ticker-item">No headlines published yet today.</span>';
+    syncTickerDistance();
     return;
   }
 
   const items = headlines
     .map((headline) => `<span class="ticker-item">${escapeHtml(headline.title)}</span>`)
     .join("");
-  container.innerHTML = `${items}${items}`;
+  container.innerHTML = `
+    <span class="ticker-group">${items}</span>
+    <span class="ticker-group" aria-hidden="true">${items}</span>
+  `;
+  syncTickerDistance();
+}
+
+function syncTickerDistance() {
+  requestAnimationFrame(() => {
+    const track = document.getElementById("news-ticker");
+    const firstGroup = track?.querySelector(".ticker-group");
+    if (!track || !firstGroup) return;
+
+    const distance = firstGroup.scrollWidth;
+    track.style.setProperty("--ticker-distance", `${distance}px`);
+    track.style.setProperty("--ticker-duration", `${Math.max(80, Math.round(distance / 24))}s`);
+    track.classList.remove("ticker-ready");
+    requestAnimationFrame(() => track.classList.add("ticker-ready"));
+  });
 }
 
 async function loadNotes(force = false) {

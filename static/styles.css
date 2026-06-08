@@ -510,6 +510,7 @@ h1 {
   background: var(--panel-strong);
   border: 1px solid var(--line);
   border-radius: 8px;
+  contain: layout paint;
 }
 
 .news-label {
@@ -630,14 +631,30 @@ h1 {
 .ticker-window {
   min-width: 0;
   overflow: hidden;
+  contain: strict;
+  transform: translate3d(0, 0, 0);
 }
 
 .ticker-track {
+  --ticker-distance: 50%;
+  --ticker-duration: 90s;
   width: max-content;
   display: flex;
   align-items: center;
   white-space: nowrap;
-  animation: ticker-scroll 70s linear infinite;
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.ticker-track.ticker-ready {
+  animation: ticker-scroll var(--ticker-duration) linear infinite;
+}
+
+.ticker-group {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
 }
 
 .ticker-item {
@@ -659,11 +676,11 @@ h1 {
 
 @keyframes ticker-scroll {
   from {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 
   to {
-    transform: translateX(-50%);
+    transform: translate3d(calc(-1 * var(--ticker-distance)), 0, 0);
   }
 }
 
