@@ -244,8 +244,8 @@ function showNewsPanels() {
     return;
   }
 
-  const cards = Array.from({ length: 4 }, (_, slot) => {
-    const headline = state.newsHeadlines[(state.newsIndex + slot) % state.newsHeadlines.length];
+  const visibleHeadlines = nextNewsSet(4);
+  const cards = visibleHeadlines.map((headline) => {
     const image = headline.image ? ` style="--news-image:url('${cssUrl(headline.image)}')"` : "";
     return `
       <article class="news-card${headline.image ? " has-image" : ""}"${image}>
@@ -260,8 +260,32 @@ function showNewsPanels() {
   }).join("");
 
   container.innerHTML = `${cards}${renderMarketPanel()}`;
-  state.newsIndex = (state.newsIndex + 4) % state.newsHeadlines.length;
   state.newsTimer = setTimeout(showNewsPanels, 2 * 60 * 1000);
+}
+
+function nextNewsSet(count) {
+  const picked = [];
+  const seenGroups = new Set();
+  const total = state.newsHeadlines.length;
+  let attempts = 0;
+
+  while (picked.length < Math.min(count, total) && attempts < total * 2) {
+    const headline = state.newsHeadlines[state.newsIndex % total];
+    state.newsIndex = (state.newsIndex + 1) % total;
+    attempts += 1;
+    const group = `${headline.topic || ""}|${headline.source || ""}`;
+    if (seenGroups.has(group) && total >= count) continue;
+    seenGroups.add(group);
+    picked.push(headline);
+  }
+
+  while (picked.length < count && total) {
+    const headline = state.newsHeadlines[state.newsIndex % total];
+    state.newsIndex = (state.newsIndex + 1) % total;
+    if (!picked.includes(headline)) picked.push(headline);
+    else break;
+  }
+  return picked;
 }
 
 function emptyNewsCard() {

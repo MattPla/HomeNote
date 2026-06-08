@@ -502,6 +502,14 @@ def normalize_calendar_url(calendar_config: dict[str, Any]) -> str:
 
 DONE_STATUSES = {"done", "complete", "completed", "finished", "closed", "true", "yes"}
 DEFAULT_NEWS_RSS_URL = "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en"
+DEFAULT_NEWS_FEEDS = [
+    {"topic": "Top", "url": DEFAULT_NEWS_RSS_URL},
+    {"topic": "World", "url": "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-US&gl=US&ceid=US:en"},
+    {"topic": "Business", "url": "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en"},
+    {"topic": "Tech", "url": "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=en-US&gl=US&ceid=US:en"},
+    {"topic": "Health", "url": "https://news.google.com/rss/headlines/section/topic/HEALTH?hl=en-US&gl=US&ceid=US:en"},
+    {"topic": "Sports", "url": "https://news.google.com/rss/headlines/section/topic/SPORTS?hl=en-US&gl=US&ceid=US:en"},
+]
 
 
 def parse_sheet_date(value: str) -> datetime | None:
@@ -781,13 +789,53 @@ def classify_weather_condition(
 
 def fetch_news(config: dict[str, Any]) -> list[dict[str, str]]:
     news_config = config.get("news", {})
-    rss_url = news_config.get("rss_url", DEFAULT_NEWS_RSS_URL)
     limit = int(news_config.get("limit", 12))
     tz = ZoneInfo(config.get("timezone", "America/New_York"))
     today = datetime.now(tz).date()
+    sources = configured_news_sources(news_config)
+    todays_headlines: list[dict[str, str]] = []
+    recent_headlines: list[dict[str, str]] = []
 
+    for source in sources:
+        try:
+            headlines = fetch_news_source(source, tz)
+        except Exception:
+            continue
+        for headline in headlines:
+            if headline["date"] == today.isoformat():
+                todays_headlines.append(headline)
+            recent_headlines.append(headline)
+
+    headlines = pick_diverse_headlines(todays_headlines, limit)
+    if len(headlines) < min(limit, 8):
+        headlines = pick_diverse_headlines(headlines + recent_headlines, limit)
+
+    if headlines:
+        save_news_cache(headlines)
+        return headlines
+    return load_news_cache()
+
+
+def configured_news_sources(news_config: dict[str, Any]) -> list[dict[str, str]]:
+    feeds = news_config.get("feeds")
+    if isinstance(feeds, list) and feeds:
+        sources = []
+        for index, feed in enumerate(feeds):
+            if isinstance(feed, str):
+                sources.append({"topic": f"News {index + 1}", "url": feed})
+            elif isinstance(feed, dict) and feed.get("url"):
+                sources.append({"topic": str(feed.get("topic") or feed.get("name") or f"News {index + 1}"), "url": str(feed["url"])})
+        if sources:
+            return sources
+
+    if news_config.get("rss_url"):
+        return [{"topic": "Top", "url": str(news_config["rss_url"])}] + DEFAULT_NEWS_FEEDS[1:4]
+    return DEFAULT_NEWS_FEEDS
+
+
+def fetch_news_source(source: dict[str, str], tz: ZoneInfo) -> list[dict[str, str]]:
     response = requests.get(
-        rss_url,
+        source["url"],
         timeout=15,
         headers={"User-Agent": "HomeNote/1.0"},
     )
@@ -807,26 +855,56 @@ def fetch_news(config: dict[str, Any]) -> list[dict[str, str]]:
         except (TypeError, ValueError):
             continue
 
-        if published.date() != today:
-            continue
-
         headlines.append(
             {
                 "title": title,
                 "link": link,
                 "published": published.isoformat(),
+                "date": published.date().isoformat(),
                 "source": (item.findtext("source") or "News").strip(),
-                "topic": (item.findtext("category") or item.findtext("source") or "Today").strip(),
+                "topic": str(source.get("topic") or item.findtext("category") or item.findtext("source") or "Today").strip(),
                 "image": extract_news_image(item),
             }
         )
-        if len(headlines) >= limit:
+        if len(headlines) >= 8:
             break
 
-    if headlines:
-        save_news_cache(headlines)
-        return headlines
-    return load_news_cache()
+    return headlines
+
+
+def pick_diverse_headlines(headlines: list[dict[str, str]], limit: int) -> list[dict[str, str]]:
+    seen_titles = set()
+    seen_links = set()
+    unique = []
+    for headline in sorted(headlines, key=lambda item: item.get("published", ""), reverse=True):
+        title_key = normalize_news_key(headline.get("title", ""))
+        link_key = headline.get("link", "")
+        if not title_key or title_key in seen_titles or link_key in seen_links:
+            continue
+        seen_titles.add(title_key)
+        seen_links.add(link_key)
+        unique.append(headline)
+
+    by_topic: dict[str, list[dict[str, str]]] = {}
+    for headline in unique:
+        by_topic.setdefault(headline.get("topic") or "News", []).append(headline)
+
+    selected = []
+    while len(selected) < limit and by_topic:
+        for topic in list(by_topic):
+            if not by_topic[topic]:
+                by_topic.pop(topic, None)
+                continue
+            selected.append(by_topic[topic].pop(0))
+            if len(selected) >= limit:
+                break
+    return selected
+
+
+def normalize_news_key(title: str) -> str:
+    clean = re.sub(r"\s+-\s+[^-]+$", "", title).lower()
+    clean = re.sub(r"[^a-z0-9]+", " ", clean)
+    return " ".join(clean.split())
 
 
 def extract_news_image(item: ET.Element) -> str:

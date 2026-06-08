@@ -33,6 +33,24 @@
   },
   "news": {
     "rss_url": "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en",
+    "feeds": [
+      {
+        "topic": "Top",
+        "url": "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en"
+      },
+      {
+        "topic": "Business",
+        "url": "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en"
+      },
+      {
+        "topic": "Tech",
+        "url": "https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=en-US&gl=US&ceid=US:en"
+      },
+      {
+        "topic": "Sports",
+        "url": "https://news.google.com/rss/headlines/section/topic/SPORTS?hl=en-US&gl=US&ceid=US:en"
+      }
+    ],
     "limit": 12
   },
   "markets": {

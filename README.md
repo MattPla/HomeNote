@@ -192,7 +192,8 @@ Use `config.example.json` as the template. Important fields:
 - `homework_sheet`: homework Google Sheet tab.
 - `weather`: latitude and longitude.
 - `news`: RSS feed and headline limit.
-- `markets`: Stooq symbols for the market summary card.
+- `news.feeds`: optional list of RSS feeds with `topic` labels for varied news cards.
+- `markets`: Nasdaq symbols for the market summary card.
 - `tasks`: optional manual fallback tasks.
 - `events`: optional manually configured events.
 
