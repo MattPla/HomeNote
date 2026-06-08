@@ -130,14 +130,16 @@ function statusToClass(status, done) {
   return "status-open";
 }
 
-function renderWeather(hours) {
+function renderWeather(weather) {
   const container = document.getElementById("weather");
+  const hours = Array.isArray(weather) ? weather : weather?.hourly || [];
+  const days = Array.isArray(weather?.daily) ? weather.daily : [];
   if (!hours.length) {
     container.innerHTML = '<div class="empty">Weather unavailable.</div>';
     return;
   }
 
-  container.innerHTML = hours
+  const hourly = hours
     .map((hour, index) => {
       const label = index === 0 ? "Now" : formatDateTime(hour.time, { hour: "numeric" });
       const condition = hour.condition || "Cloudy / Overcast";
@@ -155,6 +157,29 @@ function renderWeather(hours) {
       `;
     })
     .join("");
+
+  const daily = days
+    .map((day, index) => {
+      const label = index === 0 ? "Today" : formatDateTime(day.date, { weekday: "short" });
+      const condition = day.condition || "Cloudy / Overcast";
+      const high = day.high ?? "--";
+      const low = day.low ?? "--";
+      return `
+        <article class="weather-day condition-${escapeClass(day.conditionKey || "cloudy")}">
+          <p class="weather-time">${escapeHtml(label)}</p>
+          <div class="weather-main">
+            <span class="weather-icon" title="${escapeHtml(condition)}" aria-label="${escapeHtml(condition)}">
+              ${weatherIcon(day.icon || "cloud")}
+            </span>
+            <h3>${escapeHtml(high)}&deg;<span>/${escapeHtml(low)}&deg;</span></h3>
+          </div>
+          <p class="rain">${escapeHtml(day.rainChance ?? 0)}% rain</p>
+        </article>
+      `;
+    })
+    .join("");
+
+  container.innerHTML = `${hourly}${daily}`;
 }
 
 function weatherIcon(name) {

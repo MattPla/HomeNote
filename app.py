@@ -387,7 +387,7 @@ def fetch_homework(config: dict[str, Any]) -> list[dict[str, Any]]:
     return fetch_sheet_items(config, config.get("homework_sheet", {}), "homework")
 
 
-def fetch_weather(config: dict[str, Any]) -> tuple[list[dict[str, Any]], str | None]:
+def fetch_weather(config: dict[str, Any]) -> tuple[dict[str, list[dict[str, Any]]], str | None]:
     weather_config = config.get("weather", {})
     latitude = weather_config.get("latitude", 28.176856)
     longitude = weather_config.get("longitude", -82.67127)
@@ -402,23 +402,24 @@ def fetch_weather(config: dict[str, Any]) -> tuple[list[dict[str, Any]], str | N
             "latitude": latitude,
             "longitude": longitude,
             "hourly": "temperature_2m,precipitation_probability,weather_code,is_day,wind_speed_10m",
-            "daily": "sunrise,sunset",
+            "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset",
             "temperature_unit": "fahrenheit",
             "wind_speed_unit": "mph",
             "timezone": tz_name,
-            "forecast_days": 2,
+            "forecast_days": 7,
         },
         timeout=15,
     )
     response.raise_for_status()
-    hourly = response.json().get("hourly", {})
+    payload = response.json()
+    hourly = payload.get("hourly", {})
     times = hourly.get("time", [])
     temperatures = hourly.get("temperature_2m", [])
     rain_chances = hourly.get("precipitation_probability", [])
     weather_codes = hourly.get("weather_code", [])
     is_day_values = hourly.get("is_day", [])
     wind_speeds = hourly.get("wind_speed_10m", [])
-    daily = response.json().get("daily", {})
+    daily = payload.get("daily", {})
     sunrise_hours = {
         datetime.fromisoformat(value).replace(tzinfo=tz).replace(minute=0, second=0, microsecond=0)
         for value in daily.get("sunrise", [])
@@ -429,7 +430,7 @@ def fetch_weather(config: dict[str, Any]) -> tuple[list[dict[str, Any]], str | N
         for value in daily.get("sunset", [])
         if value
     }
-    forecast = []
+    hourly_forecast = []
 
     for index, time_value in enumerate(times):
         hour = datetime.fromisoformat(time_value).replace(tzinfo=tz)
@@ -450,7 +451,7 @@ def fetch_weather(config: dict[str, Any]) -> tuple[list[dict[str, Any]], str | N
             is_sunset=hour in sunset_hours,
         )
 
-        forecast.append(
+        hourly_forecast.append(
             {
                 "time": hour.isoformat(),
                 "temperature": temperature,
@@ -462,10 +463,43 @@ def fetch_weather(config: dict[str, Any]) -> tuple[list[dict[str, Any]], str | N
                 "icon": condition["icon"],
             }
         )
-        if len(forecast) >= 12:
+        if len(hourly_forecast) >= 12:
             break
 
-    return forecast, None
+    daily_forecast = []
+    daily_times = daily.get("time", [])
+    daily_codes = daily.get("weather_code", [])
+    daily_highs = daily.get("temperature_2m_max", [])
+    daily_lows = daily.get("temperature_2m_min", [])
+    daily_rain = daily.get("precipitation_probability_max", [])
+
+    for index, date_value in enumerate(daily_times[:7]):
+        high = round(float(daily_highs[index])) if index < len(daily_highs) and daily_highs[index] is not None else None
+        low = round(float(daily_lows[index])) if index < len(daily_lows) and daily_lows[index] is not None else None
+        weather_code = int(daily_codes[index] if index < len(daily_codes) and daily_codes[index] is not None else 0)
+        rain_chance = int(daily_rain[index] if index < len(daily_rain) and daily_rain[index] is not None else 0)
+        condition = classify_weather_condition(
+            weather_code=weather_code,
+            temperature=high or 70,
+            wind_speed=0,
+            is_day=True,
+            is_sunrise=False,
+            is_sunset=False,
+        )
+        daily_forecast.append(
+            {
+                "date": datetime.fromisoformat(date_value).replace(tzinfo=tz).isoformat(),
+                "high": high,
+                "low": low,
+                "rainChance": rain_chance,
+                "weatherCode": weather_code,
+                "condition": condition["label"],
+                "conditionKey": condition["key"],
+                "icon": condition["icon"],
+            }
+        )
+
+    return {"hourly": hourly_forecast, "daily": daily_forecast}, None
 
 
 def classify_weather_condition(

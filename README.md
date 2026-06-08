@@ -13,7 +13,7 @@ It was built for a Raspberry Pi Zero 2 W connected to a TV, with optional Wavesh
 - Google Calendar API OAuth support for private/shared calendars
 - Google Sheets task list support
 - Separate homework sheet support
-- Rolling 12-hour weather forecast from Open-Meteo
+- Rolling 12-hour weather plus 7-day forecast from Open-Meteo
 - Bottom news ticker from RSS
 - Local rotating background images
 - Optional e-paper status display showing hostname, IP, and service status
