@@ -288,7 +288,7 @@ function bindNote(element) {
   const grip = element.querySelector(".note-grip");
   const resize = element.querySelector(".note-resize");
 
-  element.addEventListener("pointerdown", () => selectNote(noteId));
+  element.addEventListener("pointerdown", () => selectNote(noteId, false));
   body.addEventListener("input", () => {
     const note = findNote(noteId);
     if (!note) return;
@@ -317,6 +317,7 @@ function selectNote(noteId, shouldRender = true) {
     document.querySelectorAll(".sticky-note").forEach((item) => {
       item.classList.toggle("selected", item.dataset.noteId === noteId);
     });
+    updateNoteElement(note);
   }
 }
 
