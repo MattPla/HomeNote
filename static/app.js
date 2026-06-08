@@ -205,19 +205,6 @@ function loadNotes() {
   } catch {
     state.notes = [];
   }
-
-  if (!state.notes.length) {
-    state.notes = [
-      createNoteData({
-        x: 42,
-        y: 34,
-        width: 260,
-        height: 180,
-        text: "Family note",
-        color: "#fff2a8",
-      }),
-    ];
-  }
   renderNotes();
 }
 
@@ -240,6 +227,7 @@ function saveNotes() {
 
 function renderNotes() {
   const canvas = document.getElementById("notes-canvas");
+  if (!canvas) return;
   canvas.innerHTML = state.notes.map(noteTemplate).join("");
   for (const element of canvas.querySelectorAll(".sticky-note")) {
     bindNote(element);
@@ -300,10 +288,11 @@ function selectNote(noteId, shouldRender = true) {
 
 function addNote() {
   const canvas = document.getElementById("notes-canvas");
+  if (!canvas) return;
   const offset = Math.min(state.notes.length * 18, 140);
   const note = createNoteData({
-    x: Math.max(24, Math.min(64 + offset, canvas.clientWidth - 280)),
-    y: Math.max(24, Math.min(42 + offset, canvas.clientHeight - 190)),
+    x: Math.max(24, Math.min(74 + offset, canvas.clientWidth - 280)),
+    y: Math.max(88, Math.min(118 + offset, canvas.clientHeight - 190)),
   });
   state.notes.push(note);
   state.selectedNoteId = note.id;
@@ -348,7 +337,7 @@ function startDrag(event, noteId) {
   event.preventDefault();
   const note = findNote(noteId);
   const canvas = document.getElementById("notes-canvas");
-  if (!note) return;
+  if (!note || !canvas) return;
   selectNote(noteId, false);
   const startX = event.clientX;
   const startY = event.clientY;
@@ -374,7 +363,7 @@ function startResize(event, noteId) {
   event.preventDefault();
   const note = findNote(noteId);
   const canvas = document.getElementById("notes-canvas");
-  if (!note) return;
+  if (!note || !canvas) return;
   selectNote(noteId, false);
   const startX = event.clientX;
   const startY = event.clientY;
