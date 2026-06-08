@@ -35,6 +35,9 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"></path><path d="M15 3v4h4M9 11h6M9 15h4"></path></svg>
             <span>Notes</span>
           </button>
+          <button class="icon-button" id="settings-toggle" type="button" title="Settings" aria-label="Settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1A2 2 0 1 1 4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.4 7A2 2 0 1 1 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3h.1a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.6h.1a1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.6 1h.2a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.6 1Z"></path></svg>
+          </button>
           <div class="clock" id="clock">--:--</div>
         </div>
       </section>
@@ -89,6 +92,55 @@
         </div>
       </section>
     </main>
+
+    <div class="settings-modal" id="settings-modal" hidden>
+      <form class="settings-panel" id="settings-form">
+        <div class="settings-head">
+          <div>
+            <p class="eyebrow">Settings</p>
+            <h2>HomeNote Sources</h2>
+          </div>
+          <button class="icon-button" id="settings-close" type="button" title="Close" aria-label="Close settings">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+          </button>
+        </div>
+
+        <div class="settings-grid">
+          <label>Title<input name="title" autocomplete="off" /></label>
+          <label>Timezone<input name="timezone" autocomplete="off" /></label>
+          <label>Days Ahead<input name="daysAhead" type="number" min="1" max="30" /></label>
+          <label>Travel Buffer<input name="travelBufferMinutes" type="number" min="0" max="120" /></label>
+
+          <label>Calendar Name<input name="calendarName" autocomplete="off" /></label>
+          <label>Calendar ID<input name="calendarId" autocomplete="off" /></label>
+          <label>Calendar Provider
+            <select name="calendarProvider">
+              <option value="google_api">Google API</option>
+              <option value="ical">iCal URL</option>
+            </select>
+          </label>
+          <label>Calendar Color<input name="calendarColor" type="color" /></label>
+          <label class="settings-wide">iCal URL<input name="calendarUrl" autocomplete="off" /></label>
+
+          <label>Task Sheet ID<input name="taskSheetId" autocomplete="off" /></label>
+          <label>Task Tab GID<input name="taskGid" autocomplete="off" /></label>
+          <label>Homework Sheet ID<input name="homeworkSheetId" autocomplete="off" /></label>
+          <label>Homework Tab GID<input name="homeworkGid" autocomplete="off" /></label>
+
+          <label>Location Label<input name="weatherLabel" autocomplete="off" /></label>
+          <label>Latitude<input name="latitude" type="number" step="0.000001" /></label>
+          <label>Longitude<input name="longitude" type="number" step="0.000001" /></label>
+        </div>
+
+        <div class="settings-actions">
+          <span id="settings-status"></span>
+          <button class="mode-button" type="submit">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"></path><path d="M17 21v-8H7v8M7 3v5h8"></path></svg>
+            <span>Save</span>
+          </button>
+        </div>
+      </form>
+    </div>
     <script src="/static/app.js"></script>
   </body>
 </html>

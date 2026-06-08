@@ -29,19 +29,38 @@ GOOGLE_CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 
 app = Flask(__name__)
 notes_lock = threading.Lock()
+config_lock = threading.Lock()
+
+DEFAULT_CONFIG = {
+    "timezone": "America/New_York",
+    "title": "HomeNote",
+    "days_ahead": 7,
+    "calendars": [],
+    "tasks": [],
+    "task_sheet": {},
+    "homework_sheet": {},
+    "weather": {
+        "latitude": 28.176856,
+        "longitude": -82.67127,
+        "label": "Home",
+    },
+}
 
 
 def load_config() -> dict[str, Any]:
     if not CONFIG_PATH.exists():
-        return {
-            "timezone": "America/New_York",
-            "title": "HomeNote",
-            "calendars": [],
-            "tasks": [],
-        }
+        return dict(DEFAULT_CONFIG)
 
     with CONFIG_PATH.open("r", encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def save_config(config: dict[str, Any]) -> None:
+    with config_lock:
+        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = CONFIG_PATH.with_suffix(".tmp")
+        temp_path.write_text(json.dumps(config, indent=2), encoding="utf-8")
+        temp_path.replace(CONFIG_PATH)
 
 
 def load_notes() -> tuple[list[dict[str, Any]], float]:
@@ -93,6 +112,90 @@ def clamp_number(value: Any, minimum: int, maximum: int, fallback: int) -> int:
     return max(minimum, min(maximum, number))
 
 
+def coerce_float(value: Any, fallback: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def public_settings(config: dict[str, Any]) -> dict[str, Any]:
+    calendars = config.get("calendars", [])
+    calendar = calendars[0] if calendars and isinstance(calendars[0], dict) else {}
+    return {
+        "title": config.get("title", "HomeNote"),
+        "timezone": config.get("timezone", "America/New_York"),
+        "daysAhead": config.get("days_ahead", 7),
+        "travelBufferMinutes": config.get("travel_buffer_minutes", 10),
+        "calendar": {
+            "name": calendar.get("name", "Calendar"),
+            "provider": calendar.get("provider", "google_api"),
+            "id": calendar.get("id", ""),
+            "url": calendar.get("url", ""),
+            "color": calendar.get("color", "#4c91d9"),
+        },
+        "taskSheet": config.get("task_sheet", {}),
+        "homeworkSheet": config.get("homework_sheet", {}),
+        "weather": config.get("weather", DEFAULT_CONFIG["weather"]),
+    }
+
+
+def apply_public_settings(config: dict[str, Any], settings: dict[str, Any]) -> dict[str, Any]:
+    updated = dict(config)
+    updated["title"] = str(settings.get("title") or config.get("title") or "HomeNote")[:80]
+    updated["timezone"] = str(settings.get("timezone") or config.get("timezone") or "America/New_York")[:80]
+    updated["days_ahead"] = clamp_number(settings.get("daysAhead"), 1, 30, int(config.get("days_ahead", 7)))
+    updated["travel_buffer_minutes"] = clamp_number(
+        settings.get("travelBufferMinutes"),
+        0,
+        120,
+        int(config.get("travel_buffer_minutes", 10)),
+    )
+
+    existing_calendar = {}
+    if config.get("calendars") and isinstance(config["calendars"][0], dict):
+        existing_calendar = dict(config["calendars"][0])
+    incoming_calendar = settings.get("calendar", {}) if isinstance(settings.get("calendar"), dict) else {}
+    calendar_id = str(incoming_calendar.get("id") or "").strip()
+    calendar_url = str(incoming_calendar.get("url") or "").strip()
+    calendar = {
+        **existing_calendar,
+        "name": str(incoming_calendar.get("name") or existing_calendar.get("name") or "Calendar")[:80],
+        "provider": str(incoming_calendar.get("provider") or existing_calendar.get("provider") or "google_api")[:40],
+        "color": str(incoming_calendar.get("color") or existing_calendar.get("color") or "#4c91d9")[:24],
+    }
+    if calendar_id:
+        calendar["id"] = calendar_id
+    else:
+        calendar.pop("id", None)
+    if calendar_url:
+        calendar["url"] = calendar_url
+    elif "url" in incoming_calendar:
+        calendar.pop("url", None)
+    updated["calendars"] = [calendar] if (calendar_id or calendar_url or existing_calendar) else []
+
+    task_sheet = settings.get("taskSheet", {}) if isinstance(settings.get("taskSheet"), dict) else {}
+    updated["task_sheet"] = {
+        "sheet_id": str(task_sheet.get("sheet_id") or task_sheet.get("sheetId") or "")[:160],
+        "gid": str(task_sheet.get("gid") or "0")[:40],
+    }
+
+    homework_sheet = settings.get("homeworkSheet", {}) if isinstance(settings.get("homeworkSheet"), dict) else {}
+    updated["homework_sheet"] = {
+        "sheet_id": str(homework_sheet.get("sheet_id") or homework_sheet.get("sheetId") or "")[:160],
+        "gid": str(homework_sheet.get("gid") or "0")[:40],
+    }
+
+    weather = settings.get("weather", {}) if isinstance(settings.get("weather"), dict) else {}
+    existing_weather = config.get("weather", DEFAULT_CONFIG["weather"])
+    updated["weather"] = {
+        "label": str(weather.get("label") or existing_weather.get("label") or "Home")[:80],
+        "latitude": coerce_float(weather.get("latitude"), float(existing_weather.get("latitude", 28.176856))),
+        "longitude": coerce_float(weather.get("longitude"), float(existing_weather.get("longitude", -82.67127))),
+    }
+    return updated
+
+
 def coerce_datetime(value: Any, tz: ZoneInfo) -> datetime:
     if isinstance(value, datetime):
         dt = value
@@ -140,7 +243,13 @@ def fetch_calendar_events(config: dict[str, Any]) -> tuple[list[dict[str, Any]],
     for calendar_config in config.get("calendars", []):
         if calendar_config.get("provider") == "google_api":
             try:
-                events.extend(fetch_google_calendar_events(calendar_config, tz, day_start, horizon))
+                weather_cfg = config.get("weather", {})
+                events.extend(fetch_google_calendar_events(
+                    calendar_config, tz, day_start, horizon,
+                    home_lat=weather_cfg.get("latitude"),
+                    home_lon=weather_cfg.get("longitude"),
+                    travel_buffer=int(config.get("travel_buffer_minutes", 10)),
+                ))
             except Exception as exc:
                 name = calendar_config.get("name", "Google Calendar")
                 errors.append(f"{name}: {exc}")
@@ -195,6 +304,9 @@ def fetch_google_calendar_events(
     tz: ZoneInfo,
     day_start: datetime,
     horizon: datetime,
+    home_lat: float | None = None,
+    home_lon: float | None = None,
+    travel_buffer: int = 10,
 ) -> list[dict[str, Any]]:
     token_path = Path(calendar_config.get("token_path", APP_DIR / "google-token.json"))
     credentials_path = Path(calendar_config.get("credentials_path", APP_DIR / "google-credentials.json"))
@@ -239,6 +351,20 @@ def fetch_google_calendar_events(
         if not event_overlaps_range(start, end, day_start, horizon):
             continue
 
+        location = item.get("location", "")
+        leave_by = ""
+        travel_minutes = None
+        all_day = "date" in raw_start
+
+        if location and not all_day and home_lat is not None and home_lon is not None:
+            coords = geocode_address(location)
+            if coords:
+                mins = fetch_driving_minutes(home_lat, home_lon, coords[0], coords[1])
+                if mins is not None:
+                    travel_minutes = mins
+                    leave_dt = start - timedelta(minutes=mins + travel_buffer)
+                    leave_by = leave_dt.strftime("%I:%M %p").lstrip("0")
+
         events.append(
             {
                 "title": item.get("summary", "Untitled event"),
@@ -246,14 +372,45 @@ def fetch_google_calendar_events(
                 "color": color,
                 "start": start.isoformat(),
                 "end": end.isoformat(),
-                "allDay": "date" in raw_start,
-                "location": item.get("location", ""),
-                "leaveBy": "",
-                "travelMinutes": None,
+                "allDay": all_day,
+                "location": location,
+                "leaveBy": leave_by,
+                "travelMinutes": travel_minutes,
             }
         )
 
     return events
+
+
+def geocode_address(address: str) -> tuple[float, float] | None:
+    try:
+        resp = requests.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": address, "format": "json", "limit": 1},
+            headers={"User-Agent": "HomeNote/1.0"},
+            timeout=5,
+        )
+        results = resp.json()
+        if results:
+            return float(results[0]["lat"]), float(results[0]["lon"])
+    except Exception:
+        pass
+    return None
+
+
+def fetch_driving_minutes(from_lat: float, from_lon: float, to_lat: float, to_lon: float) -> int | None:
+    try:
+        resp = requests.get(
+            f"http://router.project-osrm.org/route/v1/driving/{from_lon},{from_lat};{to_lon},{to_lat}",
+            params={"overview": "false"},
+            timeout=5,
+        )
+        data = resp.json()
+        if data.get("code") == "Ok" and data.get("routes"):
+            return max(1, round(data["routes"][0]["duration"] / 60))
+    except Exception:
+        pass
+    return None
 
 
 def parse_google_event_time(value: dict[str, str], tz: ZoneInfo) -> datetime:
@@ -682,6 +839,20 @@ def put_notes():
 
     version = save_notes(notes)
     return jsonify({"notes": notes, "version": version})
+
+
+@app.get("/api/settings")
+def get_settings():
+    return jsonify(public_settings(load_config()))
+
+
+@app.put("/api/settings")
+def put_settings():
+    payload = request.get_json(silent=True) or {}
+    config = load_config()
+    updated = apply_public_settings(config, payload)
+    save_config(updated)
+    return jsonify(public_settings(updated))
 
 
 if __name__ == "__main__":

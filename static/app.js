@@ -8,6 +8,9 @@ const state = {
   notesVersion: 0,
   notesSaveTimer: null,
   notesInteracting: false,
+  newsHeadlines: [],
+  newsIndex: 0,
+  newsTimer: null,
 };
 
 const backgrounds = [
@@ -180,10 +183,15 @@ function renderWeather(weather) {
     .join("");
 
   container.innerHTML = `
-    <div class="weather-divider weather-divider-hourly"><span>Hourly</span></div>
-    ${hourly}
-    <div class="weather-divider weather-divider-daily"><span>Next</span><span>7 days</span></div>
-    ${daily}
+    <div class="weather-group">
+      <p class="weather-section-label">Hourly</p>
+      <div class="weather-hourly">${hourly}</div>
+    </div>
+    <div class="weather-vsep"></div>
+    <div class="weather-group">
+      <p class="weather-section-label">Next 7 Days</p>
+      <div class="weather-daily">${daily}</div>
+    </div>
   `;
 }
 
@@ -216,35 +224,24 @@ function weatherIcon(name) {
 }
 
 function renderNews(headlines) {
+  state.newsHeadlines = headlines;
+  state.newsIndex = 0;
+  showTickerHeadline();
+}
+
+function showTickerHeadline() {
   const container = document.getElementById("news-ticker");
-  if (!headlines.length) {
-    container.innerHTML = '<span class="ticker-group"><span class="ticker-item">No headlines published yet today.</span></span>';
-    syncTickerDistance();
+  clearTimeout(state.newsTimer);
+
+  if (!state.newsHeadlines.length) {
+    container.innerHTML = '<span class="ticker-item ticker-single">No headlines published yet today.</span>';
     return;
   }
 
-  const items = headlines
-    .map((headline) => `<span class="ticker-item">${escapeHtml(headline.title)}</span>`)
-    .join("");
-  container.innerHTML = `
-    <span class="ticker-group">${items}</span>
-    <span class="ticker-group" aria-hidden="true">${items}</span>
-  `;
-  syncTickerDistance();
-}
-
-function syncTickerDistance() {
-  requestAnimationFrame(() => {
-    const track = document.getElementById("news-ticker");
-    const firstGroup = track?.querySelector(".ticker-group");
-    if (!track || !firstGroup) return;
-
-    const distance = firstGroup.scrollWidth || track.scrollWidth || 800;
-    track.style.setProperty("--ticker-distance", `${distance}px`);
-    track.style.setProperty("--ticker-duration", `${Math.max(80, Math.round(distance / 24))}s`);
-    track.classList.remove("ticker-ready");
-    requestAnimationFrame(() => track.classList.add("ticker-ready"));
-  });
+  const headline = state.newsHeadlines[state.newsIndex % state.newsHeadlines.length];
+  container.innerHTML = `<span class="ticker-item ticker-single">${escapeHtml(headline.title)}</span>`;
+  state.newsIndex += 1;
+  state.newsTimer = setTimeout(showTickerHeadline, 22000);
 }
 
 async function loadNotes(force = false) {
@@ -509,6 +506,105 @@ function initNotes() {
   syncSwatches();
 }
 
+async function openSettings() {
+  const modal = document.getElementById("settings-modal");
+  const status = document.getElementById("settings-status");
+  modal.hidden = false;
+  status.textContent = "Loading...";
+
+  try {
+    const response = await fetch("/api/settings", { cache: "no-store" });
+    const settings = await response.json();
+    fillSettings(settings);
+    status.textContent = "";
+  } catch (error) {
+    status.textContent = `Settings unavailable: ${error.message}`;
+  }
+}
+
+function closeSettings() {
+  document.getElementById("settings-modal").hidden = true;
+}
+
+function fillSettings(settings) {
+  const form = document.getElementById("settings-form");
+  form.elements.title.value = settings.title || "";
+  form.elements.timezone.value = settings.timezone || "";
+  form.elements.daysAhead.value = settings.daysAhead || 7;
+  form.elements.travelBufferMinutes.value = settings.travelBufferMinutes ?? 10;
+  form.elements.calendarName.value = settings.calendar?.name || "";
+  form.elements.calendarId.value = settings.calendar?.id || "";
+  form.elements.calendarProvider.value = settings.calendar?.provider || "google_api";
+  form.elements.calendarColor.value = settings.calendar?.color || "#4c91d9";
+  form.elements.calendarUrl.value = settings.calendar?.url || "";
+  form.elements.taskSheetId.value = settings.taskSheet?.sheet_id || "";
+  form.elements.taskGid.value = settings.taskSheet?.gid || "0";
+  form.elements.homeworkSheetId.value = settings.homeworkSheet?.sheet_id || "";
+  form.elements.homeworkGid.value = settings.homeworkSheet?.gid || "0";
+  form.elements.weatherLabel.value = settings.weather?.label || "Home";
+  form.elements.latitude.value = settings.weather?.latitude ?? "";
+  form.elements.longitude.value = settings.weather?.longitude ?? "";
+}
+
+function readSettingsForm() {
+  const form = document.getElementById("settings-form");
+  return {
+    title: form.elements.title.value.trim(),
+    timezone: form.elements.timezone.value.trim(),
+    daysAhead: Number(form.elements.daysAhead.value || 7),
+    travelBufferMinutes: Number(form.elements.travelBufferMinutes.value || 10),
+    calendar: {
+      name: form.elements.calendarName.value.trim(),
+      id: form.elements.calendarId.value.trim(),
+      provider: form.elements.calendarProvider.value,
+      color: form.elements.calendarColor.value,
+      url: form.elements.calendarUrl.value.trim(),
+    },
+    taskSheet: {
+      sheet_id: form.elements.taskSheetId.value.trim(),
+      gid: form.elements.taskGid.value.trim() || "0",
+    },
+    homeworkSheet: {
+      sheet_id: form.elements.homeworkSheetId.value.trim(),
+      gid: form.elements.homeworkGid.value.trim() || "0",
+    },
+    weather: {
+      label: form.elements.weatherLabel.value.trim(),
+      latitude: Number(form.elements.latitude.value),
+      longitude: Number(form.elements.longitude.value),
+    },
+  };
+}
+
+async function saveSettings(event) {
+  event.preventDefault();
+  const status = document.getElementById("settings-status");
+  status.textContent = "Saving...";
+
+  try {
+    const response = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(readSettingsForm()),
+    });
+    if (!response.ok) throw new Error(`Save failed (${response.status})`);
+    fillSettings(await response.json());
+    status.textContent = "Saved";
+    await refresh();
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
+
+function initSettings() {
+  document.getElementById("settings-toggle").addEventListener("click", openSettings);
+  document.getElementById("settings-close").addEventListener("click", closeSettings);
+  document.getElementById("settings-form").addEventListener("submit", saveSettings);
+  document.getElementById("settings-modal").addEventListener("click", (event) => {
+    if (event.target.id === "settings-modal") closeSettings();
+  });
+}
+
 function rotateBackground() {
   const layers = [document.getElementById("bg-a"), document.getElementById("bg-b")];
   const active = state.backgroundIndex % 2;
@@ -565,6 +661,7 @@ document.getElementById("bg-a").style.backgroundImage = `url("${backgrounds[0]}"
 document.getElementById("bg-a").classList.add("active");
 state.backgroundIndex = 1;
 initNotes();
+initSettings();
 updateClock();
 refresh();
 setInterval(updateClock, 1000);

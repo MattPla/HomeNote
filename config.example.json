@@ -2,6 +2,7 @@
   "title": "HomeNote",
   "timezone": "America/New_York",
   "days_ahead": 7,
+  "travel_buffer_minutes": 10,
   "calendars": [
     {
       "name": "Family",

@@ -16,6 +16,7 @@ It was built for a Raspberry Pi Zero 2 W connected to a TV, with optional Wavesh
 - Rolling 12-hour weather plus 7-day forecast from Open-Meteo
 - Bottom news ticker from RSS
 - Local rotating background images
+- Browser settings panel for calendar, sheets, and location
 - Optional e-paper status display showing hostname, IP, and service status
 
 ## Quick Start
@@ -43,6 +44,8 @@ sudo reboot
 ```
 
 The dashboard runs at `http://localhost:8765` on the Pi.
+
+Open the dashboard from another computer on the same network and use the gear icon to edit the calendar source, task/homework sheet IDs, timezone, travel buffer, and weather location without SSH.
 
 ## Google Calendar
 
@@ -183,6 +186,7 @@ Use `config.example.json` as the template. Important fields:
 - `title`: dashboard title.
 - `timezone`: IANA timezone such as `America/New_York`.
 - `days_ahead`: number of calendar days to show.
+- `travel_buffer_minutes`: extra leave-time buffer added to calculated drive time.
 - `calendars`: Google Calendar iCal feeds.
 - `task_sheet`: main task Google Sheet tab.
 - `homework_sheet`: homework Google Sheet tab.
