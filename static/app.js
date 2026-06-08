@@ -179,7 +179,12 @@ function renderWeather(weather) {
     })
     .join("");
 
-  container.innerHTML = `${hourly}${daily}`;
+  container.innerHTML = `
+    <div class="weather-divider weather-divider-hourly">Hourly</div>
+    ${hourly}
+    <div class="weather-divider weather-divider-daily">Next 7 days</div>
+    ${daily}
+  `;
 }
 
 function weatherIcon(name) {
