@@ -1,6 +1,6 @@
 # HomeNote
 
-HomeNote is a Raspberry Pi TV dashboard for a household calendar, tasks, homework, weather, rotating background images, and a headline ticker. It runs locally on the Pi and launches Chromium in kiosk mode after boot.
+HomeNote is a Raspberry Pi TV dashboard for a household calendar, tasks, homework, weather, rotating background images, and rotating news panels. It runs locally on the Pi and launches Chromium in kiosk mode after boot.
 
 It was built for a Raspberry Pi Zero 2 W connected to a TV, with optional Waveshare 2.13-inch e-paper status display support.
 
@@ -14,7 +14,7 @@ It was built for a Raspberry Pi Zero 2 W connected to a TV, with optional Wavesh
 - Google Sheets task list support
 - Separate homework sheet support
 - Rolling 12-hour weather plus 7-day forecast from Open-Meteo
-- Bottom news ticker from RSS
+- Five rotating RSS news panels with optional story images
 - Local rotating background images
 - Browser settings panel for calendar, sheets, and location
 - Optional e-paper status display showing hostname, IP, and service status

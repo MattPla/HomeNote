@@ -11,6 +11,7 @@ const state = {
   newsHeadlines: [],
   newsIndex: 0,
   newsTimer: null,
+  newsSignature: "",
 };
 
 const backgrounds = [
@@ -224,24 +225,41 @@ function weatherIcon(name) {
 }
 
 function renderNews(headlines) {
+  const signature = headlines.map((headline) => `${headline.title}|${headline.image || ""}`).join("::");
+  if (signature === state.newsSignature) return;
+  state.newsSignature = signature;
   state.newsHeadlines = headlines;
   state.newsIndex = 0;
-  showTickerHeadline();
+  showNewsPanels();
 }
 
-function showTickerHeadline() {
-  const container = document.getElementById("news-ticker");
+function showNewsPanels() {
+  const container = document.getElementById("news-panels");
   clearTimeout(state.newsTimer);
 
   if (!state.newsHeadlines.length) {
-    container.innerHTML = '<span class="ticker-item ticker-single">No headlines published yet today.</span>';
+    container.innerHTML = '<article class="news-card news-empty"><h3>No headlines published yet today.</h3></article>';
     return;
   }
 
-  const headline = state.newsHeadlines[state.newsIndex % state.newsHeadlines.length];
-  container.innerHTML = `<span class="ticker-item ticker-single">${escapeHtml(headline.title)}</span>`;
-  state.newsIndex += 1;
-  state.newsTimer = setTimeout(showTickerHeadline, 22000);
+  const cards = Array.from({ length: 5 }, (_, slot) => {
+    const headline = state.newsHeadlines[(state.newsIndex + slot) % state.newsHeadlines.length];
+    const image = headline.image ? ` style="--news-image:url('${cssUrl(headline.image)}')"` : "";
+    return `
+      <article class="news-card${headline.image ? " has-image" : ""}"${image}>
+        <div class="news-card-shade"></div>
+        <div class="news-card-content">
+          <p>${escapeHtml(headline.topic || headline.source || "Today")}</p>
+          <h3>${escapeHtml(headline.title)}</h3>
+          <span>${escapeHtml(headline.source || "")}</span>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  container.innerHTML = cards;
+  state.newsIndex = (state.newsIndex + 5) % state.newsHeadlines.length;
+  state.newsTimer = setTimeout(showNewsPanels, 2 * 60 * 1000);
 }
 
 async function loadNotes(force = false) {
@@ -628,6 +646,10 @@ function escapeHtml(value) {
 
 function escapeClass(value) {
   return String(value ?? "").toLowerCase().replace(/[^a-z0-9-]/g, "-");
+}
+
+function cssUrl(value) {
+  return String(value ?? "").replaceAll("\\", "\\\\").replaceAll("'", "\\'");
 }
 
 async function refresh() {

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import csv
 from email.utils import parsedate_to_datetime
+from html import unescape
 import io
 import json
 import os
+import re
 import threading
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
@@ -756,12 +758,35 @@ def fetch_news(config: dict[str, Any]) -> list[dict[str, str]]:
                 "title": title,
                 "link": link,
                 "published": published.isoformat(),
+                "source": (item.findtext("source") or "News").strip(),
+                "topic": (item.findtext("category") or item.findtext("source") or "Today").strip(),
+                "image": extract_news_image(item),
             }
         )
         if len(headlines) >= limit:
             break
 
     return headlines
+
+
+def extract_news_image(item: ET.Element) -> str:
+    for child in item:
+        tag = child.tag.rsplit("}", 1)[-1].lower()
+        url = child.attrib.get("url", "")
+        if tag in {"content", "thumbnail"} and url:
+            return url
+        if tag == "enclosure" and child.attrib.get("type", "").startswith("image/") and url:
+            return url
+
+    text = " ".join(
+        value or ""
+        for value in [
+            item.findtext("description"),
+            item.findtext("{http://purl.org/rss/1.0/modules/content/}encoded"),
+        ]
+    )
+    match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', text, flags=re.IGNORECASE)
+    return unescape(match.group(1)) if match else ""
 
 
 @app.get("/")
